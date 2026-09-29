@@ -1,5 +1,6 @@
 import uuid
 from flask import Flask, jsonify, request
+from bundle_service import process_bundle
 
 app = Flask(__name__)
 bundles = {}
@@ -27,10 +28,14 @@ def create_bundle():
         "bundle_id": bundle_id,
         "product_id": data["product_id"],
         "release_version": data["release_version"],
-        "status": "PENDING"
+        "status": "PENDING",
+        "categories": [],
+        "artifacts": []
     }
 
     bundles[bundle_id] = bundle
+
+    process_bundle(bundle)
 
     return jsonify(bundle), 202
 
