@@ -29,7 +29,7 @@ def create_bundle():
         "product_id": data["product_id"],
         "release_version": data["release_version"],
         "status": "PENDING",
-        "categories": [],
+        "manifest": [],
         "artifacts": []
     }
 

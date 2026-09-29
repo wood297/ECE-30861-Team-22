@@ -33,7 +33,7 @@ def test_create_bundle():
     assert data["product_id"] == "test-product"
     assert data["release_version"] == "v1.0"
     assert data["status"] == "PENDING"
-    assert data["categories"] == []
+    assert data["manifest"] == []
     assert data["artifacts"] == []  
     assert "bundle_id" in data
 
