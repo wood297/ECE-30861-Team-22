@@ -1,15 +1,17 @@
+from artifact_pipeline import retrieve_and_classify
+
 def process_bundle(bundle):
     """
     Processes a bundle request.
-
-    This function is the integration point for artifact retrieval,
-    classification, and bundle generation.
 
     Person 2: retrieve and classify artifacts.
     Person 3: generate the final bundle and manifest.
     """
 
-    # TODO: Person 2 - retrieve and classify artifacts
+    # Person 2: fills in bundle["artifacts"] and bundle["manifest"]
+    retrieve_and_classify(bundle)
+    if bundle["status"] == "FAILED":
+        return bundle
 
     # TODO: Person 3 - generate bundle and manifest
 
