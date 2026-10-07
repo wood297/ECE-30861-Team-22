@@ -1,0 +1,51 @@
+{
+  "spec_version": "1.0.0",
+  "description": "Predetermined expected results for the pod's shared fixtures (Phase 2 section 4.2). Written by hand before running any implementation; never derived from one.",
+  "files": {
+    "SBOM": "sbom.md",
+    "Risk Assessment": "risk_assessment.md",
+    "Test Logs": "test_logs.md",
+    "User Instructions": "user_instructions.md"
+  },
+  "releases": {
+    "complete": {
+      "product_id": "prd-88",
+      "release_version": "v1.2",
+      "purpose": "Every category has a valid Markdown artifact.",
+      "expected_bundle_status": "COMPLETED",
+      "categories": {
+        "SBOM": "PRESENT",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "PRESENT",
+        "User Instructions": "PRESENT"
+      }
+    },
+    "missing": {
+      "product_id": "prd-88",
+      "release_version": "v1.3",
+      "purpose": "Exactly one category (Test Logs) has no artifact.",
+      "categories": {
+        "SBOM": "PRESENT",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "MISSING",
+        "User Instructions": "PRESENT"
+      }
+    },
+    "invalid": {
+      "product_id": "prd-88",
+      "release_version": "v1.4",
+      "purpose": "The SBOM artifact exists but is empty.",
+      "categories": {
+        "SBOM": "INVALID",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "PRESENT",
+        "User Instructions": "PRESENT"
+      }
+    },
+    "unknown": {
+      "product_id": "prd-88",
+      "release_version": "v0.0-does-not-exist",
+      "purpose": "No release with this identifier exists in any source."
+    }
+  }
+}

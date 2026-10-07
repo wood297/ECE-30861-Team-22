@@ -1,9 +1,12 @@
+import copy
 import uuid
 from flask import Flask, jsonify, request
 from bundle_service import process_bundle
+from selftest import create_test_blueprint
 
 app = Flask(__name__)
 bundles = {}
+app.register_blueprint(create_test_blueprint(reset_state=bundles.clear))
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -34,10 +37,12 @@ def create_bundle():
     }
 
     bundles[bundle_id] = bundle
+    # Spec 5.1: the 202 acknowledges the queued task as PENDING; results come from GET
+    acknowledgement = copy.deepcopy(bundle)
 
     process_bundle(bundle)
 
-    return jsonify(bundle), 202
+    return jsonify(acknowledgement), 202
 
 @app.route("/bundles/<bundle_id>", methods=["GET"])
 def get_bundle(bundle_id):
