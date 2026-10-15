@@ -1,36 +1,58 @@
 """Testing endpoints for the validated system (this service).
 
-    POST /test/setup   clear stored bundles and list the fixture releases available
-    POST /test/run     run this repository's pytest suite and return the report
-    GET  /test/report  return the report from the last /test/run
+Required by the Cross-team Testing Interface:
+
+    POST /test/setup   {"session_id": "...", "setup": {}}
+        Registers the session and checks the fixture source is available.
+        201 {"session_id": ...}; 409 if the ID already exists; 500 if preparation fails.
+    GET  /test/report  ?session_id=...
+        Code coverage measured for the session: {"session_id", "coverage": {"code": {...}}}.
+
+Extra (not part of the course interface):
+
+    POST /test/selftest   run this repository's pytest suite and return the report
+    GET  /test/selftest   return the report from the last self-test
+
+Bundles are isolated by their own UUID, so setup needs no reset and sessions cannot
+interfere with each other. Errors are {"message": ..., "source": "system"}.
 """
 import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
-from artifact_pipeline import FIXTURES_ROOT
+import artifact_pipeline
 
 REPO_ROOT = Path(__file__).parent
-# Set while a self-test is running so a test that calls /test/run cannot recurse
+# Set while a self-test is running so a test that calls /test/selftest cannot recurse
 SELFTEST_ENV = "CRA_SELFTEST_RUNNING"
+CODE_COVERAGE_BASIS = ("Source lines; per-session code coverage instrumentation is not implemented "
+                       "yet, so counts are unavailable")
 
+_lock = threading.Lock()
+_sessions = {}
 _last_report = {"report": None}
 
 
+def error(message, status):
+    return jsonify({"message": message, "source": "system"}), status
+
+
 def list_fixtures():
-    if not FIXTURES_ROOT.is_dir():
+    root = artifact_pipeline.FIXTURES_ROOT
+    if not root.is_dir():
         return []
     return [
         {"product_id": product.name, "release_version": release.name}
-        for product in sorted(FIXTURES_ROOT.iterdir()) if product.is_dir()
+        for product in sorted(root.iterdir()) if product.is_dir()
         for release in sorted(product.iterdir()) if release.is_dir()
     ]
 
@@ -86,26 +108,57 @@ def run_internal_tests(test_path="tests", timeout=300):
     }
 
 
-def create_test_blueprint(reset_state):
+def create_test_blueprint():
     bp = Blueprint("selftest", __name__, url_prefix="/test")
 
     @bp.route("/setup", methods=["POST"])
     def setup():
-        reset_state()
-        return jsonify({"status": "ready", "fixtures": list_fixtures()}), 200
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return error("Request body must be a JSON object with session_id", 400)
+        session_id = data.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            return error("session_id must be a non-empty string", 400)
+        setup_data = data.get("setup", {})
+        if not isinstance(setup_data, dict):
+            return error("setup must be a JSON object (use {} when there is no starting data)", 400)
 
-    @bp.route("/run", methods=["POST"])
-    def run():
+        # Phase 3 reads every release from one controlled source: the fixtures folder
+        fixtures = list_fixtures()
+        if not fixtures:
+            return error("Could not prepare the session: the fixture source is missing or empty", 500)
+
+        with _lock:
+            if session_id in _sessions:
+                return error(f"Session {session_id} already exists", 409)
+            _sessions[session_id] = {"created_at": datetime.now(timezone.utc).isoformat(), "setup": setup_data}
+        return jsonify({"session_id": session_id, "fixtures": fixtures}), 201
+
+    @bp.route("/report", methods=["GET"])
+    def report():
+        session_id = request.args.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            return error("session_id query parameter is required", 400)
+        with _lock:
+            if session_id not in _sessions:
+                return error(f"Unknown session {session_id}", 404)
+        return jsonify({
+            "session_id": session_id,
+            "coverage": {"code": {"covered": None, "total": None, "basis": CODE_COVERAGE_BASIS}},
+        }), 200
+
+    @bp.route("/selftest", methods=["POST"])
+    def run_selftest():
         if os.environ.get(SELFTEST_ENV):
-            return jsonify({"error": "A self-test is already running in this process"}), 409
+            return error("A self-test is already running in this process", 409)
         report = run_internal_tests()
         _last_report["report"] = report
         return jsonify(report), 200
 
-    @bp.route("/report", methods=["GET"])
-    def report():
+    @bp.route("/selftest", methods=["GET"])
+    def selftest_report():
         if _last_report["report"] is None:
-            return jsonify({"error": "No report available; call POST /test/run first"}), 404
+            return error("No self-test report yet; call POST /test/selftest first", 404)
         return jsonify(_last_report["report"]), 200
 
     return bp

@@ -1,50 +1,70 @@
-"""Tester web service: runs the acceptance suite against the system at a given URL.
+"""Tester web service, following the course's Cross-team Testing Interface.
 
-    POST /test/setup   {"url": "<base url>"}   reset the target (via its /test/setup) and check it is reachable
-    POST /test/run     {"url": "<base url>"}   run the acceptance suite against the target, return the report
-    GET  /test/report  ?url=<base url>         latest report for that target (or the latest overall)
+    POST /test/setup   {"target_url": "<system base url>"}
+        Creates a session ID, calls the system's POST /test/setup with it and waits
+        until the system is ready. 201 {"session_id": ...}. A system setup error is
+        returned with the system's own status, message and source.
+    POST /test/run     {"session_id": "..."}
+        Runs the acceptance suite once against the session's target. 200 with the
+        suite report; 500 {"message", "source": "tester"} if the tester aborts.
+        409 if the session already ran or is running.
+    GET  /test/report  ?session_id=...
+        Returns the stored report without running anything; 409 before the suite ends.
 
-Optional fields for setup/run: "token" (sent as a Bearer token); for run only:
-"poll_timeout" (seconds to wait for a terminal bundle status, default 5) and
-"only" (list of criterion ids to run).
+Optional fields: "token" on setup (sent to the target as a Bearer token); "poll_timeout"
+(seconds to wait for a terminal bundle status, default 5) and "only" (list of test ids)
+on run. Errors are {"message": ..., "source": "tester" | "system" | "communication" | "unknown"}.
+
+Sessions and reports live in memory until the process stops, so run a single process
+(one gunicorn worker) in production.
 
 Run locally with: python -m test_runner.service --port 5001
 """
 import argparse
 import threading
-import urllib.error
+import uuid
 from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request
 
 from test_runner.client import HttpClient
-from test_runner.suite import run_suite
+from test_runner.session import SetupError, setup_target
+from test_runner.suite import aborted_report, run_suite
 
 app = Flask(__name__)
 
 _lock = threading.Lock()
-_setups = {}
-_reports = {}
-_latest = {"url": None}
+# session_id -> {"target_url", "token", "state": ready|running|done|aborted, "report"}
+_sessions = {}
 
 
 def make_client(url, token=None):
     return HttpClient(url, token=token)
 
 
+def error(message, status, source="tester"):
+    return jsonify({"message": message, "source": source}), status
+
+
 def _payload():
     data = request.get_json(silent=True)
-    return data if isinstance(data, dict) else {}
+    return data if isinstance(data, dict) else None
 
 
 def _target_url(data):
-    url = data.get("url") or request.args.get("url")
+    url = data.get("target_url")
     if not isinstance(url, str) or not url.strip():
-        return None, "url is required"
+        return None, "target_url is required"
     parsed = urlparse(url.strip())
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        return None, "url must be an absolute http(s) URL"
+        return None, "target_url must be an absolute http(s) URL"
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        return None, "target_url must be a base URL without credentials, query or fragment"
     return url.strip().rstrip("/"), None
+
+
+def _session_id(value):
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 @app.route("/health", methods=["GET"])
@@ -55,63 +75,83 @@ def health():
 @app.route("/test/setup", methods=["POST"])
 def setup():
     data = _payload()
-    url, error = _target_url(data)
-    if error:
-        return jsonify({"error": error}), 400
+    if data is None:
+        return error("Request body must be a JSON object with target_url", 400)
+    url, problem = _target_url(data)
+    if problem:
+        return error(problem, 400)
+    token = data.get("token")
+    if token is not None and not isinstance(token, str):
+        return error("token must be a string", 400)
 
-    client = make_client(url, data.get("token"))
+    session_id = str(uuid.uuid4())
     try:
-        resp = client.request("POST", "/test/setup")
-    except (urllib.error.URLError, OSError) as exc:
-        return jsonify({"error": f"target unreachable: {exc}", "url": url}), 502
+        setup_target(make_client(url, token), session_id)
+    except SetupError as exc:
+        return jsonify(exc.body()), exc.status
+    except Exception as exc:
+        return error(f"Tester setup failed: {type(exc).__name__}: {exc}", 500)
 
-    if 200 <= resp.status < 300:
-        target_setup = "ok"
-    elif resp.status in (404, 405):
-        target_setup = "not_supported"
-    else:
-        target_setup = f"error (HTTP {resp.status})"
-
-    result = {"url": url, "reachable": True, "target_setup": target_setup, "target_response": resp.json()}
     with _lock:
-        _setups[url] = result
-    return jsonify(result), 200
+        _sessions[session_id] = {"target_url": url, "token": token, "state": "ready", "report": None}
+    return jsonify({"session_id": session_id}), 201
 
 
 @app.route("/test/run", methods=["POST"])
 def run():
     data = _payload()
-    url, error = _target_url(data)
-    if error:
-        return jsonify({"error": error}), 400
+    if data is None:
+        return error("Request body must be a JSON object with session_id", 400)
+    session_id = _session_id(data.get("session_id"))
+    if session_id is None:
+        return error("session_id is required", 400)
 
+    # Invalid requests are rejected before they can consume the session
     poll_timeout = data.get("poll_timeout", 5.0)
     if isinstance(poll_timeout, bool) or not isinstance(poll_timeout, (int, float)) or not 0 <= poll_timeout <= 60:
-        return jsonify({"error": "poll_timeout must be a number of seconds between 0 and 60"}), 400
+        return error("poll_timeout must be a number of seconds between 0 and 60", 400)
     only = data.get("only")
     if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only)):
-        return jsonify({"error": "only must be a list of criterion ids"}), 400
+        return error("only must be a list of test ids", 400)
 
-    report = run_suite(make_client(url, data.get("token")), target=url,
-                       poll_timeout=float(poll_timeout), only=set(only) if only else None)
     with _lock:
-        _reports[url] = report
-        _latest["url"] = url
+        session = _sessions.get(session_id)
+        if session is None:
+            return error(f"Unknown session {session_id}; call POST /test/setup first", 404)
+        if session["state"] != "ready":
+            return error(f"Session {session_id} has already run (state: {session['state']}); "
+                         "create a new session with POST /test/setup to repeat the suite", 409)
+        session["state"] = "running"
+
+    url = session["target_url"]
+    try:
+        report = run_suite(make_client(url, session["token"]), session_id=session_id, target=url,
+                           poll_timeout=float(poll_timeout), only=set(only) if only else None)
+    except Exception as exc:
+        report = aborted_report(session_id, url, f"{type(exc).__name__}: {exc}", set(only) if only else None)
+
+    with _lock:
+        session["report"] = report
+        session["state"] = "aborted" if report.get("aborted") else "done"
+    if report.get("aborted"):
+        return error(f"The tester aborted: {report['abort_message']}. "
+                     "Retrieve the available results with GET /test/report.", 500)
     return jsonify(report), 200
 
 
-@app.route("/test/report", methods=["GET", "POST"])
+@app.route("/test/report", methods=["GET"])
 def report():
-    data = _payload()
-    url = data.get("url") or request.args.get("url")
+    session_id = _session_id(request.args.get("session_id"))
+    if session_id is None:
+        return error("session_id query parameter is required", 400)
     with _lock:
-        if url:
-            found = _reports.get(url.strip().rstrip("/"))
-        else:
-            found = _reports.get(_latest["url"])
-    if found is None:
-        return jsonify({"error": "No report available; call POST /test/run first"}), 404
-    return jsonify(found), 200
+        session = _sessions.get(session_id)
+        if session is None:
+            return error(f"Unknown session {session_id}", 404)
+        if session["report"] is None:
+            return error(f"The suite for session {session_id} has not ended (state: {session['state']}); "
+                         "try again later", 409)
+        return jsonify(session["report"]), 200
 
 
 if __name__ == "__main__":

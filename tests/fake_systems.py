@@ -23,7 +23,12 @@ DEFECTS = {
     "drop_missing",      # leaves MISSING categories out of the manifest
     "always_completed",  # reports every bundle as COMPLETED
     "zip_only",          # exposes content only through a zip download_url (not a defect)
+    "crash_on_bad_input",  # answers 500 instead of 400 for a non-string identifier
+    "no_test_endpoints",   # has no /test/setup or /test/report
 }
+
+# What the reference system reports from GET /test/report
+CODE_COVERAGE = {"covered": 42, "total": 50, "basis": "Source lines of the reference system"}
 
 
 def make_reference_system(*defects):
@@ -33,6 +38,25 @@ def make_reference_system(*defects):
     app = Flask("reference_system")
     store = {}
     archives = {}
+    sessions = set()
+
+    if "no_test_endpoints" not in defects:
+        @app.route("/test/setup", methods=["POST"])
+        def setup():
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict) or not isinstance(data.get("session_id"), str) or not data["session_id"]:
+                return jsonify({"message": "session_id is required", "source": "system"}), 400
+            if data["session_id"] in sessions:
+                return jsonify({"message": "session already exists", "source": "system"}), 409
+            sessions.add(data["session_id"])
+            return jsonify({"session_id": data["session_id"]}), 201
+
+        @app.route("/test/report", methods=["GET"])
+        def report():
+            session_id = request.args.get("session_id")
+            if session_id not in sessions:
+                return jsonify({"message": "unknown session", "source": "system"}), 404
+            return jsonify({"session_id": session_id, "coverage": {"code": CODE_COVERAGE}}), 200
 
     @app.route("/bundles", methods=["POST"])
     def create():
@@ -43,6 +67,8 @@ def make_reference_system(*defects):
             if field not in data:
                 return jsonify({"error": f"Missing required field: '{field}'"}), 400
             value = data[field]
+            if "crash_on_bad_input" in defects and not isinstance(value, str):
+                return "Internal Server Error", 500
             if "lax_validation" not in defects and (not isinstance(value, str) or not value.strip()):
                 return jsonify({"error": f"'{field}' must be a non-empty string"}), 400
 

@@ -27,7 +27,7 @@ class HttpClient:
             # Phase 2 section 5.3: cross-team tests send a shared token in the headers
             self.default_headers["Authorization"] = f"Bearer {token}"
 
-    def request(self, method, path, json_body=None, raw_body=None, headers=None):
+    def request(self, method, path, json_body=None, raw_body=None, headers=None, timeout=None):
         if path.startswith(("http://", "https://")):
             url = path
         else:
@@ -42,7 +42,7 @@ class HttpClient:
 
         req = urllib.request.Request(url, data=data, method=method, headers=all_headers)
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout or self.timeout) as resp:
                 return Response(resp.status, resp.read(), dict(resp.headers))
         except urllib.error.HTTPError as err:
             return Response(err.code, err.read(), dict(err.headers))
@@ -54,6 +54,6 @@ class WSGIClient:
     def __init__(self, app):
         self._client = app.test_client()
 
-    def request(self, method, path, json_body=None, raw_body=None, headers=None):
+    def request(self, method, path, json_body=None, raw_body=None, headers=None, timeout=None):
         resp = self._client.open(path, method=method, json=json_body, data=raw_body, headers=headers)
         return Response(resp.status_code, resp.get_data(), dict(resp.headers))

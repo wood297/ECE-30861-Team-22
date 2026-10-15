@@ -6,7 +6,7 @@ from selftest import create_test_blueprint
 
 app = Flask(__name__)
 bundles = {}
-app.register_blueprint(create_test_blueprint(reset_state=bundles.clear))
+app.register_blueprint(create_test_blueprint())
 
 @app.route("/health", methods=["GET"])
 def health():
