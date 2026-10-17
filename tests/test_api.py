@@ -46,7 +46,7 @@ def test_missing_product_id():
     })
 
     assert response.status_code == 400
-    assert response.get_json() == {"error": "product_id is required"}
+    assert response.get_json() == {"error": "product_id is required and must be a nonempty string"}
 
 
 def test_missing_release_version():
@@ -57,7 +57,7 @@ def test_missing_release_version():
     })
 
     assert response.status_code == 400
-    assert response.get_json() == {"error": "release_version is required"}
+    assert response.get_json() == {"error": "release_version is required and must be a nonempty string"}
 
 
 def test_get_bundle():
@@ -83,3 +83,60 @@ def test_get_nonexistent_bundle():
 
     assert response.status_code == 404
     assert response.get_json() == {"error": "Bundle not found"}
+
+def test_setup_session():
+    client = app.test_client()
+
+    response = client.post("/test/setup", json={
+        "session_id": "test-session-1",
+        "setup": {}
+    })
+
+    assert response.status_code == 201
+    assert response.get_json() == {"session_id": "test-session-1"}
+
+
+def test_duplicate_session():
+    client = app.test_client()
+
+    client.post("/test/setup", json={
+        "session_id": "duplicate-session",
+        "setup": {}
+    })
+
+    response = client.post("/test/setup", json={
+        "session_id": "duplicate-session",
+        "setup": {}
+    })
+
+    assert response.status_code == 409
+    assert response.get_json()["source"] == "system"
+
+
+def test_report_session():
+    client = app.test_client()
+
+    client.post("/test/setup", json={
+        "session_id": "report-session",
+        "setup": {}
+    })
+
+    response = client.get("/test/report?session_id=report-session")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+    assert data["session_id"] == "report-session"
+    assert "coverage" in data
+    assert "code" in data["coverage"]
+    assert data["coverage"]["code"]["covered"] is None
+    assert data["coverage"]["code"]["total"] is None
+
+
+def test_report_unknown_session():
+    client = app.test_client()
+
+    response = client.get("/test/report?session_id=unknown-session")
+
+    assert response.status_code == 404
+    assert response.get_json()["source"] == "system"
