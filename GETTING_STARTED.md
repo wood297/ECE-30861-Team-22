@@ -211,8 +211,8 @@ Always send the header `Content-Type: application/json`.
 
 | You send | You get |
 |---|---|
-| No `product_id` | `400 {"error": "product_id is required"}` |
-| No `release_version` | `400 {"error": "release_version is required"}` |
+| No `product_id`, or not a non-empty string | `400 {"error": "product_id is required and must be a nonempty string"}` |
+| No `release_version`, or not a non-empty string | `400 {"error": "release_version is required and must be a nonempty string"}` |
 | A release that doesn't exist | `202`, then `GET` shows `"status": "FAILED"` and an `error` message |
 | A `bundle_id` that doesn't exist | `404 {"error": "Bundle not found"}` |
 

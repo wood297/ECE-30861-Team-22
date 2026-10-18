@@ -241,7 +241,6 @@ These tests are marked `xfail` until the defects are fixed:
 | Test | Gap | Where |
 |---|---|---|
 | API-06, AC-02 | Bundle generation is still a TODO, so a bundle never leaves `PROCESSING` or becomes `COMPLETED`/`PARTIAL_SUCCESS`, and there is no `download_url`. | `bundle_service.py` (Person 3) |
-| API-03 | `POST /bundles` accepts an empty or blank `product_id`/`release_version` (spec 5.2 says non-empty). A non-string `product_id` crashes with a 500 error, which the tester reports as `error` with source `system`. | `app.py` |
 | `test_crlf_line_endings_are_preserved` | `read_text()` turns CRLF line endings into LF, so content is not preserved exactly (REQ-08). | `artifact_pipeline.py` |
 | `test_non_utf8_artifact_is_invalid_rather_than_a_crash` | A file that is not valid UTF-8 raises `UnicodeDecodeError` and the request fails with a 500 error. It should be reported as `INVALID`. | `artifact_pipeline.py` |
 

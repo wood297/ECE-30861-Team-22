@@ -19,11 +19,11 @@ def create_bundle():
     if not data:
         return jsonify({"error": "Request body must contain JSON"}), 400
 
-    if "product_id" not in data:
-        return jsonify({"error": "product_id is required"}), 400
+    if not isinstance(data.get("product_id"), str) or not data["product_id"].strip():
+        return jsonify({"error": "product_id is required and must be a nonempty string"}), 400
 
-    if "release_version" not in data:
-        return jsonify({"error": "release_version is required"}), 400
+    if not isinstance(data.get("release_version"), str) or not data["release_version"].strip():
+        return jsonify({"error": "release_version is required and must be a nonempty string"}), 400
 
     bundle_id = str(uuid.uuid4())
 
