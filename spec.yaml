@@ -1,17 +1,73 @@
 openapi: 3.0.3
 info:
-  title: Cybersecurity Interceptor Pod API
-  description: HTTP interface for cross-team testing of the CRA technical documentation compilation engine.
-  version: 1.1.0
+  title: Cybersecurity Interceptor System API (Team 22)
+  description: |
+    The Team 22 system: collects the technical documentation the EU Cyber Resilience Act
+    requires for a product release, and exposes the testing endpoints required by the course's
+    Cross-team Testing Interface (`/test/setup`, `/test/report`).
+
+    - No authentication.
+    - Bundles, their zip archives and test sessions are kept in memory and cleared on restart.
+    - Phase 3 reads every release from one controlled source, the repository's
+      `fixtures/<product_id>/<release_version>/` folder (`prd-88` `v1.2`, `v1.3`, `v1.4`).
+    - The tester service is a separate API at `https://team22.13-58-35-224.sslip.io/tester`.
+
+    Known deviations, also noted on the affected responses:
+    - A malformed JSON body (400) or a non-JSON `Content-Type` (415) on `POST /bundles` gets
+      Flask's default HTML error page, not an `ErrorResponse`.
+    - A JSON body that is not an object (for example `[1]` or `"x"`) on `POST /bundles`
+      gets an HTML 500.
+    - A `bundle_id` that is not a UUID gets the same 404 as an unknown UUID.
+  version: 1.2.0
 servers:
-  - url: http://api.cyberinterceptor.internal/v1
-    description: Pod Cross-Team Testing Server
+  - url: https://team22.13-58-35-224.sslip.io/system
+    description: Deployed system (AWS EC2)
+  - url: http://localhost:5000
+    description: Local development (`flask --app app run`)
+tags:
+  - name: Bundles
+    description: Project API
+  - name: Testing
+    description: Cross-team Testing Interface, system side
+  - name: Service
+    description: Discovery and health
 paths:
+  /:
+    get:
+      tags: [Service]
+      summary: List this service's endpoints
+      operationId: getIndex
+      responses:
+        '200':
+          description: Service name and endpoint list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexResponse'
+
+  /health:
+    get:
+      tags: [Service]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: The service is running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
   /bundles:
     post:
+      tags: [Bundles]
       summary: Initiate Release Documentation Bundle Generation
       operationId: createBundleTask
-      description: Initiates the retrieval of technical documentation artifacts for a specific product and release.
+      description: |
+        Collects the artifacts for one product release and classifies each documentation
+        category. Processing finishes before the response is sent, so the acknowledgement says
+        `PENDING` but the first `GET /bundles/{bundle_id}` already returns a terminal status.
+        Every request creates a new bundle with a new `bundle_id`.
       requestBody:
         required: true
         content:
@@ -20,105 +76,439 @@ paths:
               $ref: '#/components/schemas/BundleRequest'
       responses:
         '202':
-          description: Compilation task successfully queued.
+          description: Bundle accepted. The body is the bundle as first stored.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BundleTaskResponse'
         '400':
-          description: Invalid request payload.
+          description: |
+            A field is missing, empty, blank or not a string, or the body is an empty JSON
+            object (`ErrorResponse`). Known deviation: a malformed JSON body also gets 400, but
+            as Flask's HTML error page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingField:
+                  value: {error: "product_id is required and must be a nonempty string"}
+                emptyBody:
+                  value: {error: "Request body must contain JSON"}
+            text/html:
+              schema:
+                type: string
+        '415':
+          description: |
+            The request's `Content-Type` is not `application/json`. Known deviation: the body
+            is Flask's HTML error page.
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: |
+            Known deviation: a JSON body that is not an object (for example an array or a
+            string) is not validated and fails with Flask's HTML error page.
+          content:
+            text/html:
+              schema:
+                type: string
+
   /bundles/{bundle_id}:
     get:
+      tags: [Bundles]
       summary: Retrieve Bundle Status, Manifest, and Output
       operationId: getBundleStatus
-      description: Returns the status of the bundle generation, the generated manifest detailing the collection status of all documentation categories, and a download link to the consolidated artifact bundle.
+      description: |
+        Returns the bundle's status, the manifest with the collection status of every
+        documentation category, the collected artifacts, and a download link to the zip
+        archive. `download_url` is present only when an archive exists (`COMPLETED` or
+        `PARTIAL_SUCCESS`); `error` is present only when the bundle is `FAILED`.
       parameters:
-        - name: bundle_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/BundleId'
       responses:
         '200':
-          description: Successful retrieval of task status, manifest, and/or compiled bundle.
+          description: The bundle.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BundleStatusResponse'
         '404':
-          description: Bundle task ID not found.
+          description: |
+            No bundle has this ID. Known deviation: an ID that is not a UUID gets this same
+            response, not a separate validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Bundle not found"
+
+  /bundles/{bundle_id}/download:
+    get:
+      tags: [Bundles]
+      summary: Download the bundle archive
+      operationId: downloadBundle
+      description: |
+        The zip archive that `download_url` points to: each collected artifact under its
+        source file name (`sbom.md`, `risk_assessment.md`, `test_logs.md`,
+        `user_instructions.md`), byte for byte as retrieved, plus `manifest.json` with
+        `product_id`, `release_version`, `status` and `manifest`. The archive omits
+        `bundle_id` and uses a fixed timestamp, so identical requests give identical archives.
+      parameters:
+        - $ref: '#/components/parameters/BundleId'
+      responses:
+        '200':
+          description: The archive, sent as `bundle-<bundle_id>.zip`.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: No archive for this ID (unknown bundle, or a `FAILED` bundle).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Bundle archive not found"
+
+  /test/setup:
+    post:
+      tags: [Testing]
+      summary: Prepare a test session
+      operationId: setupTestSession
+      description: |
+        Registers the session ID supplied by a tester (or by staff for direct testing) and
+        checks that the fixture source is available. Bundles are isolated by their own UUID,
+        so no data is reset. Does not run tests.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestSetupRequest'
+      responses:
+        '201':
+          description: The session is ready. Returns the same session ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestSetupResponse'
+        '400':
+          description: The body is not a JSON object, `session_id` is missing or blank, or `setup` is not an object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestError'
+        '409':
+          description: This session ID has already been set up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestError'
+              example:
+                message: "Session run-123 already exists"
+                source: system
+        '500':
+          description: The fixture source is missing or empty, so the session cannot be prepared.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestError'
+
+  /test/report:
+    get:
+      tags: [Testing]
+      summary: Code coverage for a test session
+      operationId: getTestReport
+      description: |
+        Returns code coverage measured for the session. Code coverage is not instrumented yet,
+        so both counts are `null` and `basis` says why. Setup completes before it responds,
+        so this endpoint never returns 409. Does not run any project operation.
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Code coverage for the session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestReportResponse'
+        '400':
+          description: The `session_id` query parameter is missing or blank.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestError'
+        '404':
+          description: Unknown session ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestError'
 
 components:
+  parameters:
+    BundleId:
+      name: bundle_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
   schemas:
     BundleRequest:
       type: object
       required:
         - product_id
         - release_version
+      description: Other fields (such as the `session_id` our tester adds) are ignored.
       properties:
         product_id:
           type: string
-          description: Unique identifier for the product.
-          example: "prd-88392"
+          minLength: 1
+          description: Unique identifier for the product. Must not be blank.
+          example: "prd-88"
         release_version:
           type: string
-          description: Specific version identifier for the product release.
-          example: "v1.2.4"
+          minLength: 1
+          description: Specific version identifier for the product release. Must not be blank.
+          example: "v1.2"
 
     BundleTaskResponse:
       type: object
+      required: [bundle_id, product_id, release_version, status, manifest, artifacts]
       properties:
         bundle_id:
           type: string
           format: uuid
+        product_id:
+          type: string
+        release_version:
+          type: string
         status:
           type: string
-          example: "PENDING"
+          enum: [PENDING]
+        manifest:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ArtifactManifestItem'
+        artifacts:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/Artifact'
+      example:
+        bundle_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        product_id: "prd-88"
+        release_version: "v1.2"
+        status: "PENDING"
+        manifest: []
+        artifacts: []
 
     ArtifactManifestItem:
       type: object
       required:
         - category
         - status
+        - external_source
       properties:
         category:
           type: string
-          description: The documentation category supported by the common specification (e.g., Risk Assessment, SBOM).
-          example: "Risk Assessment"
+          enum: [SBOM, Risk Assessment, Test Logs, User Instructions]
+          description: The documentation category. Every bundle that is not `FAILED` lists all four exactly once.
         status:
           type: string
           enum: [PRESENT, MISSING, INVALID, INACCESSIBLE]
-          description: The collection status of the specific artifact category.
+          description: |
+            PRESENT: the file exists and is non-blank UTF-8 text. MISSING: no file.
+            INVALID: the file is empty or not UTF-8. INACCESSIBLE: the file exists but could not be read.
         external_source:
           type: string
-          description: The external system configured and queried for this artifact.
-          example: "Confluence"
+          description: The source queried for this artifact. Always `fixtures` in Phase 3.
+          example: "fixtures"
         source_failure_detail:
           type: string
-          description: Diagnostic description if the source could not be accessed or the artifact was invalid.
+          description: Present only for INVALID and INACCESSIBLE.
+          example: "sbom.md is empty"
+
+    Artifact:
+      type: object
+      required: [category, product_id, release_version, content]
+      description: One collected artifact. Only PRESENT categories have an artifact.
+      properties:
+        category:
+          type: string
+          example: "SBOM"
+        product_id:
+          type: string
+        release_version:
+          type: string
+        content:
+          type: string
+          description: The file's text exactly as retrieved, line endings included.
 
     BundleStatusResponse:
       type: object
+      required: [bundle_id, product_id, release_version, status, manifest, artifacts]
       properties:
         bundle_id:
           type: string
           format: uuid
         product_id:
           type: string
-          description: The product identifier associated with this collection.
+          description: The product identifier from the request.
         release_version:
           type: string
-          description: The release version associated with this collection.
+          description: The release version from the request.
         status:
           type: string
           enum: [PENDING, PROCESSING, COMPLETED, PARTIAL_SUCCESS, FAILED]
+          description: |
+            COMPLETED when every category is PRESENT; PARTIAL_SUCCESS when at least one is not;
+            FAILED when the release does not exist or the identifiers are unsafe (contain `/`
+            or `..`). Processing is synchronous, so GET returns only the three terminal values.
         manifest:
           type: array
-          description: A manifest identifying all documentation categories, their collection statuses, and any source failures.
+          description: One item per documentation category. Empty when the bundle is FAILED.
           items:
             $ref: '#/components/schemas/ArtifactManifestItem'
+        artifacts:
+          type: array
+          description: The collected artifacts with their content. Empty when the bundle is FAILED.
+          items:
+            $ref: '#/components/schemas/Artifact'
         download_url:
           type: string
           format: uri
-          description: Link to the consolidated bundle containing successfully retrieved artifacts with preserved source content.
+          description: Absolute URL of `GET /bundles/{bundle_id}/download`. Present for COMPLETED and PARTIAL_SUCCESS only.
+          example: "https://team22.13-58-35-224.sslip.io/system/bundles/f47ac10b-58cc-4372-a567-0e02b2c3d479/download"
+        error:
+          type: string
+          description: Why the bundle failed. Present for FAILED only.
+          example: "No documents found for prd-88 v9"
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    TestSetupRequest:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+          minLength: 1
+          description: Unique ID chosen by the tester (or by staff for direct testing).
+          example: "run-123"
+        setup:
+          type: object
+          description: Starting data. None is needed; send `{}` or leave it out.
+          default: {}
+
+    TestSetupResponse:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+          description: The same ID that was sent.
+        fixtures:
+          type: array
+          description: The releases available to test.
+          items:
+            type: object
+            required: [product_id, release_version]
+            properties:
+              product_id:
+                type: string
+              release_version:
+                type: string
+      example:
+        session_id: "run-123"
+        fixtures:
+          - {product_id: "prd-88", release_version: "v1.2"}
+          - {product_id: "prd-88", release_version: "v1.3"}
+          - {product_id: "prd-88", release_version: "v1.4"}
+
+    CoverageMeasure:
+      type: object
+      required: [covered, total, basis]
+      description: Counts are both null when the measure is unavailable.
+      properties:
+        covered:
+          type: integer
+          minimum: 0
+          nullable: true
+        total:
+          type: integer
+          minimum: 0
+          nullable: true
+        basis:
+          type: string
+          minLength: 1
+          description: What was counted, or why it could not be.
+
+    TestReportResponse:
+      type: object
+      required: [session_id, coverage]
+      properties:
+        session_id:
+          type: string
+        coverage:
+          type: object
+          required: [code]
+          properties:
+            code:
+              $ref: '#/components/schemas/CoverageMeasure'
+      example:
+        session_id: "run-123"
+        coverage:
+          code:
+            covered: null
+            total: null
+            basis: "Source lines; per-session code coverage instrumentation is not implemented yet, so counts are unavailable"
+
+    TestError:
+      type: object
+      required: [message, source]
+      properties:
+        message:
+          type: string
+          minLength: 1
+        source:
+          type: string
+          enum: [system]
+
+    IndexResponse:
+      type: object
+      required: [service, endpoints]
+      properties:
+        service:
+          type: string
+          example: "Team 22 CRA documentation system"
+        endpoints:
+          type: array
+          items:
+            type: string
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
