@@ -1,7 +1,8 @@
 import copy
+import io
 import uuid
-from flask import Flask, jsonify, request
-from bundle_service import process_bundle
+from flask import Flask, jsonify, request, send_file, url_for
+from bundle_service import archives, process_bundle
 from selftest import create_test_blueprint
 
 app = Flask(__name__)
@@ -49,7 +50,20 @@ def get_bundle(bundle_id):
     if bundle_id not in bundles:
         return jsonify({"error": "Bundle not found"}), 404
 
-    return jsonify(bundles[bundle_id]), 200
+    body = dict(bundles[bundle_id])
+    if bundle_id in archives:
+        # Absolute, so it still resolves when the app is mounted under /system (wsgi.py)
+        body["download_url"] = url_for("download_bundle", bundle_id=bundle_id, _external=True)
+    return jsonify(body), 200
+
+@app.route("/bundles/<bundle_id>/download", methods=["GET"])
+def download_bundle(bundle_id):
+    # FAILED bundles have no archive, so they 404 here too
+    if bundle_id not in archives:
+        return jsonify({"error": "Bundle archive not found"}), 404
+
+    return send_file(io.BytesIO(archives[bundle_id]), mimetype="application/zip",
+                     as_attachment=True, download_name=f"bundle-{bundle_id}.zip")
 
 if __name__ == "__main__":
     app.run(debug=True)

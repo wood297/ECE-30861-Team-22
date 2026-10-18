@@ -3,6 +3,8 @@
 Each test builds its own release folder under tmp_path, so the shared fixtures can
 change without breaking these tests.
 """
+from pathlib import Path
+
 import pytest
 
 import artifact_pipeline
@@ -111,7 +113,6 @@ def test_content_is_preserved_exactly(fixtures_root):
     assert bundle["artifacts"][0]["content"] == content
 
 
-@pytest.mark.xfail(reason="Known gap: read_text() normalises CRLF to LF, altering source content (REQ-08)")
 def test_crlf_line_endings_are_preserved(fixtures_root):
     make_release(fixtures_root, {"sbom.md": b"# SBOM\r\nline two\r\n"})
 
@@ -120,14 +121,46 @@ def test_crlf_line_endings_are_preserved(fixtures_root):
     assert bundle["artifacts"][0]["content"] == "# SBOM\r\nline two\r\n"
 
 
-@pytest.mark.xfail(raises=UnicodeDecodeError,
-                   reason="Known gap: a non-UTF-8 artifact crashes classification instead of being INVALID")
 def test_non_utf8_artifact_is_invalid_rather_than_a_crash(fixtures_root):
     make_release(fixtures_root, {**ALL_FILES, "sbom.md": b"\xff\xfe\x00binary"})
 
     bundle = classify()
 
     assert statuses(bundle)["SBOM"] == "INVALID"
+    assert "SBOM" not in [a["category"] for a in bundle["artifacts"]]
+
+
+def test_unreadable_artifact_is_inaccessible_and_others_are_kept(fixtures_root, monkeypatch):
+    make_release(fixtures_root, ALL_FILES)
+    read_bytes = Path.read_bytes
+
+    def fail_for_sbom(path):
+        if path.name == "sbom.md":
+            raise PermissionError(13, "Permission denied")
+        return read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", fail_for_sbom)
+
+    bundle = classify()
+
+    sbom = next(item for item in bundle["manifest"] if item["category"] == "SBOM")
+    assert sbom["status"] == "INACCESSIBLE"
+    assert sbom["source_failure_detail"] == "Could not read sbom.md: Permission denied"
+    assert sorted(a["category"] for a in bundle["artifacts"]) == sorted(set(EXPECTED_FILES) - {"SBOM"})
+
+
+def test_manifest_items_name_their_source_and_explain_failures(fixtures_root):
+    files = {**ALL_FILES, "sbom.md": "", "test_logs.md": b"\xff"}
+    del files["risk_assessment.md"]
+    make_release(fixtures_root, files)
+
+    items = {item["category"]: item for item in classify()["manifest"]}
+
+    assert {item["external_source"] for item in items.values()} == {"fixtures"}
+    assert items["SBOM"]["source_failure_detail"] == "sbom.md is empty"
+    assert items["Test Logs"]["source_failure_detail"] == "test_logs.md is not valid UTF-8 text"
+    assert "source_failure_detail" not in items["Risk Assessment"]
+    assert "source_failure_detail" not in items["User Instructions"]
 
 
 @pytest.mark.parametrize("product, release", [("prd-1", "v9.9"), ("no-such-product", "v1.0")])

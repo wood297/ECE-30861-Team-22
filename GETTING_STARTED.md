@@ -154,17 +154,25 @@ Answer (`200 OK`; shortened to one artifact):
   "bundle_id": "650d3b5e-d4d8-425d-a8ea-7bed612625ed",
   "product_id": "prd-88",
   "release_version": "v1.3",
-  "status": "PROCESSING",
+  "status": "PARTIAL_SUCCESS",
   "manifest": [
-    {"category": "SBOM",              "status": "PRESENT"},
-    {"category": "Risk Assessment",   "status": "PRESENT"},
-    {"category": "Test Logs",         "status": "MISSING"},
-    {"category": "User Instructions", "status": "PRESENT"}
+    {"category": "SBOM",              "status": "PRESENT", "external_source": "fixtures"},
+    {"category": "Risk Assessment",   "status": "PRESENT", "external_source": "fixtures"},
+    {"category": "Test Logs",         "status": "MISSING", "external_source": "fixtures"},
+    {"category": "User Instructions", "status": "PRESENT", "external_source": "fixtures"}
   ],
   "artifacts": [
     {"category": "SBOM", "product_id": "prd-88", "release_version": "v1.3", "content": "# SBOM\n"}
-  ]
+  ],
+  "download_url": "http://localhost:5000/bundles/650d3b5e-d4d8-425d-a8ea-7bed612625ed/download"
 }
+```
+
+**Step 3 (optional): download the bundle** as a zip. It holds every `PRESENT` document under
+its original file name, byte for byte, plus a `manifest.json`:
+
+```bash
+curl -o bundle.zip http://localhost:5000/bundles/650d3b5e-d4d8-425d-a8ea-7bed612625ed/download
 ```
 
 ### 3.4 What the request fields mean
@@ -186,16 +194,20 @@ Always send the header `Content-Type: application/json`.
 | `status` | Overall state of the bundle (table below). |
 | `manifest` | One entry per document category, with that category's status (table below). |
 | `artifacts` | The documents that were found, with their full, unchanged text in `content`. |
+| `download_url` | Link to the zip of the bundle. Present when `status` is `COMPLETED` or `PARTIAL_SUCCESS`. |
 | `error` | Present only when `status` is `FAILED`; explains why. |
+
+Each `manifest` entry also has `external_source` (always `"fixtures"` in Phase 3) and, when the
+category is `INVALID` or `INACCESSIBLE`, a `source_failure_detail` saying why.
 
 **Bundle status** (`status`):
 
 | Value | Meaning |
 |---|---|
 | `PENDING` | Request received, not processed yet. You only see this in the first response. |
-| `PROCESSING` | Documents were collected and classified. **Today every successful bundle stops here**, because the final "generate bundle" step is still being built (see [TESTING.md](TESTING.md#known-gaps-and-limitations)). |
-| `COMPLETED` | *(planned)* Every category is `PRESENT`. |
-| `PARTIAL_SUCCESS` | *(planned)* Some categories are not `PRESENT`. |
+| `PROCESSING` | Documents are being collected and classified. Processing is quick, so you normally won't see this. |
+| `COMPLETED` | Every category is `PRESENT`. |
+| `PARTIAL_SUCCESS` | Some categories are not `PRESENT`. The bundle still holds the ones that are. |
 | `FAILED` | The release doesn't exist, or the identifiers are unsafe (for example, they contain `/` or `..`). |
 
 **Category status** (each `manifest` entry):
@@ -204,8 +216,8 @@ Always send the header `Content-Type: application/json`.
 |---|---|---|
 | `PRESENT` | Found and usable | The file exists and has text in it |
 | `MISSING` | Not found | The file doesn't exist |
-| `INVALID` | Found but unusable | The file exists but is empty (or only spaces) |
-| `INACCESSIBLE` | The source couldn't be reached | Not produced yet: Phase 3 has only one local source (planned for Phase 4) |
+| `INVALID` | Found but unusable | The file exists but is empty (or only spaces), or is not UTF-8 text |
+| `INACCESSIBLE` | The source couldn't be reached | The file exists but couldn't be read (e.g. no permission). Live sources come in Phase 4. |
 
 ### 3.6 Errors you can get
 

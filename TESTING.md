@@ -236,13 +236,8 @@ non-empty IDs and messages, a source on every error, and valid coverage counts.
 
 ### Defects found by the tests
 
-These tests are marked `xfail` until the defects are fixed:
-
-| Test | Gap | Where |
-|---|---|---|
-| API-06, AC-02 | Bundle generation is still a TODO, so a bundle never leaves `PROCESSING` or becomes `COMPLETED`/`PARTIAL_SUCCESS`, and there is no `download_url`. | `bundle_service.py` (Person 3) |
-| `test_crlf_line_endings_are_preserved` | `read_text()` turns CRLF line endings into LF, so content is not preserved exactly (REQ-08). | `artifact_pipeline.py` |
-| `test_non_utf8_artifact_is_invalid_rather_than_a_crash` | A file that is not valid UTF-8 raises `UnicodeDecodeError` and the request fails with a 500 error. It should be reported as `INVALID`. | `artifact_pipeline.py` |
+None at the moment. When a test finds a defect that isn't fixed yet, mark it `xfail` and list it
+here with the test, the gap and the file it's in.
 
 When a defect is fixed, its test shows as XPASS. Remove its entry from `KNOWN_GAPS` in
 `tests/test_acceptance.py`, or the `xfail` marker in `tests/test_pipeline.py`.

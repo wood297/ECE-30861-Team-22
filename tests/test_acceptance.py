@@ -15,10 +15,7 @@ from test_runner.suite import CRITERIA, run_suite
 
 # Criteria that fail today because the functionality is not built yet. Non-strict,
 # so once fixed they show up as XPASS: delete the entry when that happens.
-KNOWN_GAPS = {
-    "API-06": "Bundle generation (Person 3) is not implemented; status stays PROCESSING",
-    "AC-02": "Bundle generation (Person 3) is not implemented; status never becomes COMPLETED",
-}
+KNOWN_GAPS = {}
 
 
 @pytest.fixture(scope="module")

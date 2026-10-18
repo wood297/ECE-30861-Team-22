@@ -14,6 +14,7 @@ same host while it is handling a run.
 import json
 
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.wrappers import Response
 
 from app import app as system_app
@@ -30,4 +31,7 @@ def index(environ, start_response):
     return response(environ, start_response)
 
 
-application = DispatcherMiddleware(index, {"/system": system_app, "/tester": tester_app})
+# Caddy terminates HTTPS and forwards to gunicorn on 127.0.0.1, so trust one proxy's
+# X-Forwarded-* headers. That makes download_url come out as https://<host>/system/...
+application = ProxyFix(DispatcherMiddleware(index, {"/system": system_app, "/tester": tester_app}),
+                       x_for=1, x_proto=1, x_host=1)
