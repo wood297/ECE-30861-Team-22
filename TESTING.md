@@ -109,8 +109,8 @@ Optional extras: `"token"` on setup (sent to the target as `Authorization: Beare
 |---|---|
 | `POST /test/setup` | Body `{"session_id": "...", "setup": {}}`. Registers the session and checks the fixture source exists. `201 {"session_id", "fixtures"}`, `400` bad body, `409` ID already used, `500` fixtures missing. |
 | `GET /test/report` | `?session_id=...`. Returns `{"session_id", "coverage": {"code": {...}}}`. Counts are `null` for now (see gaps). `400` / `404` for a missing or unknown ID. |
-| `POST /test/selftest` | Not part of the course interface. Runs `pytest tests/` in a subprocess and returns a per-test report. |
-| `GET /test/selftest` | Returns the last self-test report. `404` before the first run. |
+| `POST /test/selftest` | Not part of the course interface. Runs `pytest tests/` in a subprocess and returns a per-test report. Off (`404`) unless the server runs with `CRA_ENABLE_SELFTEST=1`, so it stays off in production. |
+| `GET /test/selftest` | Returns the last self-test report. `404` before the first run, or when self-test is off. |
 
 Locally, `pytest` runs the same suite.
 

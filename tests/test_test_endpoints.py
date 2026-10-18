@@ -31,6 +31,7 @@ def clean_state(monkeypatch):
     service._sessions.clear()
     # /test/selftest sets this for its pytest subprocess; tests below control it explicitly
     monkeypatch.delenv(selftest.SELFTEST_ENV, raising=False)
+    monkeypatch.setenv(selftest.SELFTEST_ENABLE_ENV, "1")
 
 
 @pytest.fixture
@@ -118,6 +119,15 @@ def test_system_report_errors(system):
     response = system.get("/test/report", query_string={"session_id": "never-set-up"})
     assert response.status_code == 404
     assert_error_body(response.get_json(), "system")
+
+
+def test_system_selftest_is_off_unless_enabled(system, monkeypatch):
+    monkeypatch.delenv(selftest.SELFTEST_ENABLE_ENV)
+    monkeypatch.setattr(selftest, "run_internal_tests", lambda: pytest.fail("self-test ran while disabled"))
+
+    for response in (system.post("/test/selftest"), system.get("/test/selftest")):
+        assert response.status_code == 404
+        assert_error_body(response.get_json(), "system")
 
 
 def test_system_selftest_report_is_404_before_any_run(system):

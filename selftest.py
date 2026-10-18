@@ -8,7 +8,7 @@ Required by the Cross-team Testing Interface:
     GET  /test/report  ?session_id=...
         Code coverage measured for the session: {"session_id", "coverage": {"code": {...}}}.
 
-Extra (not part of the course interface):
+Extra (not part of the course interface), off unless CRA_ENABLE_SELFTEST=1:
 
     POST /test/selftest   run this repository's pytest suite and return the report
     GET  /test/selftest   return the report from the last self-test
@@ -34,6 +34,8 @@ import artifact_pipeline
 REPO_ROOT = Path(__file__).parent
 # Set while a self-test is running so a test that calls /test/selftest cannot recurse
 SELFTEST_ENV = "CRA_SELFTEST_RUNNING"
+# /test/selftest is opt-in: anyone who can reach it can make the server run pytest
+SELFTEST_ENABLE_ENV = "CRA_ENABLE_SELFTEST"
 CODE_COVERAGE_BASIS = ("Source lines; per-session code coverage instrumentation is not implemented "
                        "yet, so counts are unavailable")
 
@@ -149,6 +151,8 @@ def create_test_blueprint():
 
     @bp.route("/selftest", methods=["POST"])
     def run_selftest():
+        if os.environ.get(SELFTEST_ENABLE_ENV) != "1":
+            return error(f"Self-test is disabled; set {SELFTEST_ENABLE_ENV}=1 to enable it", 404)
         if os.environ.get(SELFTEST_ENV):
             return error("A self-test is already running in this process", 409)
         report = run_internal_tests()
@@ -157,6 +161,8 @@ def create_test_blueprint():
 
     @bp.route("/selftest", methods=["GET"])
     def selftest_report():
+        if os.environ.get(SELFTEST_ENABLE_ENV) != "1":
+            return error(f"Self-test is disabled; set {SELFTEST_ENABLE_ENV}=1 to enable it", 404)
         if _last_report["report"] is None:
             return error("No self-test report yet; call POST /test/selftest first", 404)
         return jsonify(_last_report["report"]), 200
