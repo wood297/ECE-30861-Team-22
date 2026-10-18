@@ -9,6 +9,18 @@ app = Flask(__name__)
 bundles = {}
 app.register_blueprint(create_test_blueprint())
 
+@app.route("/", methods=["GET"])
+def index():
+    # The base URL is what other teams register, so make it say what lives under it
+    return jsonify({"service": "Team 22 CRA documentation system", "endpoints": [
+        "GET  /health",
+        "POST /bundles",
+        "GET  /bundles/<bundle_id>",
+        "GET  /bundles/<bundle_id>/download",
+        "POST /test/setup",
+        "GET  /test/report",
+    ]}), 200
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200

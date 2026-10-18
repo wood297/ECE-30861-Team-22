@@ -1,4 +1,5 @@
 import sys
+import pytest
 import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -140,3 +141,20 @@ def test_report_unknown_session():
 
     assert response.status_code == 404
     assert response.get_json()["source"] == "system"
+
+@pytest.mark.parametrize("path, service", [
+    ("/system", "Team 22 CRA documentation system"),
+    ("/system/", "Team 22 CRA documentation system"),
+    ("/tester", "Team 22 CRA tester"),
+    ("/tester/", "Team 22 CRA tester"),
+])
+def test_base_urls_list_their_endpoints(path, service):
+    # The registered base URLs should answer in a browser instead of 404ing
+    from werkzeug.test import Client
+    from wsgi import application
+
+    response = Client(application).get(path, follow_redirects=True)
+
+    assert response.status_code == 200
+    assert response.get_json()["service"] == service
+    assert response.get_json()["endpoints"]

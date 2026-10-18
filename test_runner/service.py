@@ -67,6 +67,17 @@ def _session_id(value):
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+@app.route("/", methods=["GET"])
+def index():
+    # The base URL is what graders register, so make it say what lives under it
+    return jsonify({"service": "Team 22 CRA tester", "endpoints": [
+        "GET  /health",
+        "POST /test/setup   {\"target_url\": \"<system base URL>\"}",
+        "POST /test/run     {\"session_id\": \"<id>\"}",
+        "GET  /test/report?session_id=<id>",
+    ]}), 200
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
