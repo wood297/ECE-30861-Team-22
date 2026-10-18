@@ -509,6 +509,21 @@ that meets all four requirements. Both of our services share it:
 Expect about 45 minutes the first time. Do this **once for the team**, and share the AWS login
 only through a password manager, never in chat or in the repository.
 
+> **Scripted version (what we actually used).** With the AWS CLI signed in (`aws login`), the
+> steps below are automated by three scripts in `deploy/`:
+>
+> - `BUDGET_EMAIL=you@example.com deploy/aws_setup.sh` does 8.1–8.3 in `us-east-2`: SSH key
+>   `~/.ssh/team22-ec2`, security group, t3.micro with termination protection and an
+>   auto-recovery alarm, Elastic IP, and a $15/month budget.
+> - `deploy/deploy.sh <elastic-ip>` does 8.5–8.8. It sends the current **commit** (the working
+>   tree must be clean), runs `deploy/server_setup.sh` on the server (Caddy, systemd), runs the
+>   tests there, and restarts the app. The deployed commit is in `VERSION` on the server.
+>
+> Our server: `13.58.35.224`, base URL **https://13-58-35-224.sslip.io**
+> (`/system` and `/tester`). Log in with `ssh -i ~/.ssh/team22-ec2 ubuntu@13.58.35.224`. The
+> key is on Person 3's laptop only; to give a teammate access, add their public key to
+> `~/.ssh/authorized_keys` on the server and their IP to the security group.
+
 ### 8.1 Protect yourself from surprise bills (5 min)
 
 1. Sign in to the AWS console (https://console.aws.amazon.com).
