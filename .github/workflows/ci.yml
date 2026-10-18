@@ -8,6 +8,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt ruff mypy bandit pip-audit openapi-spec-validator
+
+      - name: Lint (ruff, rules in ruff.toml)
+        run: ruff check .
+      - name: Type check (mypy)
+        run: mypy --ignore-missing-imports .
+      - name: Security scan (bandit; accepted findings are marked "# nosec" with a reason)
+        run: bandit -q -r . -x ./tests,./.venv
+      - name: Dependency vulnerability scan (pip-audit)
+        run: pip-audit -r requirements.txt
+      - name: API contract validation (spec.yaml is valid OpenAPI)
+        run: openapi-spec-validator spec.yaml
+
   test:
     runs-on: ubuntu-24.04
     steps:

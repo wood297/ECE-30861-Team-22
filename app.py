@@ -78,4 +78,4 @@ def download_bundle(bundle_id):
                      as_attachment=True, download_name=f"bundle-{bundle_id}.zip")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True)  # local development only; production runs gunicorn via wsgi.py  # nosec B201

@@ -42,7 +42,8 @@ class HttpClient:
 
         req = urllib.request.Request(url, data=data, method=method, headers=all_headers)
         try:
-            with urllib.request.urlopen(req, timeout=timeout or self.timeout) as resp:
+            # The tester service only accepts http(s) target URLs (service._target_url)
+            with urllib.request.urlopen(req, timeout=timeout or self.timeout) as resp:  # nosec B310
                 return Response(resp.status, resp.read(), dict(resp.headers))
         except urllib.error.HTTPError as err:
             return Response(err.code, err.read(), dict(err.headers))

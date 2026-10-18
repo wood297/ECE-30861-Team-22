@@ -15,7 +15,7 @@ from test_runner.suite import CRITERIA, run_suite
 
 # Criteria that fail today because the functionality is not built yet. Non-strict,
 # so once fixed they show up as XPASS: delete the entry when that happens.
-KNOWN_GAPS = {}
+KNOWN_GAPS: dict[str, str] = {}
 
 
 @pytest.fixture(scope="module")

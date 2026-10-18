@@ -17,13 +17,13 @@ Bundles are isolated by their own UUID, so setup needs no reset and sessions can
 interfere with each other. Errors are {"message": ..., "source": "system"}.
 """
 import os
-import subprocess
+import subprocess  # runs only our own pytest suite (run_internal_tests)  # nosec B404
 import sys
 import tempfile
 import threading
 import time
 import uuid
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # parses only the JUnit file our own pytest run wrote  # nosec B405
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -61,7 +61,7 @@ def list_fixtures():
 
 def parse_junit(path):
     results = []
-    for case in ET.parse(path).getroot().iter("testcase"):
+    for case in ET.parse(path).getroot().iter("testcase"):  # trusted file from our pytest run  # nosec B314
         outcome, reason = "passed", None
         for child in case:
             if child.tag in ("failure", "error"):
@@ -85,7 +85,7 @@ def run_internal_tests(test_path="tests", timeout=300):
     t0 = time.monotonic()
     with tempfile.TemporaryDirectory() as tmp:
         junit = Path(tmp) / "junit.xml"
-        proc = subprocess.run(
+        proc = subprocess.run(  # fixed argument list, no user input  # nosec B603
             [sys.executable, "-m", "pytest", str(test_path), "-q", "-p", "no:cacheprovider",
              f"--junitxml={junit}"],
             cwd=REPO_ROOT, env=dict(os.environ, **{SELFTEST_ENV: "1"}),

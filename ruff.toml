@@ -1,0 +1,5 @@
+# Lint rules for `ruff check .` (run in CI). pycodestyle errors/warnings and pyflakes.
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
