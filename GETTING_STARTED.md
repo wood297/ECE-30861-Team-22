@@ -8,8 +8,8 @@ This guide assumes you have never used this project before. It walks through, in
 4. [The data the app expects](#4-the-data-the-app-expects)
 5. [Running our own tests (pytest)](#5-running-our-own-tests-pytest)
 6. [Running the test runner locally](#6-running-the-test-runner-locally)
-7. [Choosing where to deploy](#7-choosing-where-to-deploy)
-8. [Deploying on AWS EC2, step by step](#8-deploying-on-aws-ec2-step-by-step)
+7. [Our live deployment](#7-our-live-deployment)
+8. [Deploying and running the server](#8-deploying-and-running-the-server)
 9. [Integrating once we are deployed](#9-integrating-once-we-are-deployed)
 10. [Troubleshooting](#10-troubleshooting)
 
@@ -34,6 +34,9 @@ The repository contains **two programs**:
 
 Both are web services. You talk to them by sending HTTP requests with JSON bodies, using `curl`
 in the terminal, Postman, or Python. Neither has a web page or buttons yet.
+
+Both are live at **https://team22.13-58-35-224.sslip.io** (the app at `/system`, the test runner
+at `/tester`). Section 7 explains how that server is set up.
 
 ---
 
@@ -466,9 +469,97 @@ gunicorn doesn't run on Windows. Windows users can skip this step or use WSL.
 
 ---
 
-## 7. Choosing where to deploy
+## 7. Our live deployment
 
-### 7.1 What any host must give us
+Both services run on one AWS EC2 server at:
+
+**https://team22.13-58-35-224.sslip.io**
+
+| URL | What answers | What you get back |
+|---|---|---|
+| `/` | `wsgi.py`'s index, a health check for the whole server | `{"status": "ok", "system": "/system", "tester": "/tester"}` |
+| `/system` | the app (`app.py`). This is our **System base URL**. | The list of the app's endpoints |
+| `/system/health` | the app | `{"status":"ok"}` |
+| `/tester` | the test runner (`test_runner/service.py`). This is our **Tester base URL**. | The list of the tester's endpoints |
+| `/tester/health` | the test runner | `{"status":"ok"}` |
+| anything else | `wsgi.py` | `404 {"message": "Not found", "source": "system"}` |
+
+Two small things you'll notice with `curl`:
+
+- `/system` and `/tester` with no trailing slash answer `308` and redirect to `/system/` and
+  `/tester/`. Use `curl -L`, or add the slash. Real endpoints such as `/system/bundles` don't redirect.
+- `http://` redirects to `https://`.
+
+### 7.1 How a request reaches our code
+
+```
+other team's tester, or curl on your laptop
+   │   https://team22.13-58-35-224.sslip.io/system/bundles
+   ▼
+sslip.io DNS        team22.13-58-35-224.sslip.io  →  13.58.35.224 (our Elastic IP)
+   ▼
+AWS security group  ports 80 and 443 open to everyone; port 22 (SSH) open to one IP only
+   ▼
+Caddy  :80, :443    HTTPS with a Let's Encrypt certificate; redirects http → https
+   │   forwards to 127.0.0.1:8000 and adds X-Forwarded-* headers
+   ▼
+gunicorn            systemd service "cra": 1 worker, 8 threads, 180 s timeout
+   ▼
+wsgi.py             /system/... → app.py
+                    /tester/... → test_runner/service.py
+                    /           → the small index above
+```
+
+- **sslip.io** is a free DNS service: any name that ends in `<IP-with-dashes>.sslip.io` points to
+  that IP, so we didn't have to buy a domain. `team22.` is only a label. If sslip.io itself is down,
+  our URL stops working even though the server is fine.
+- **Caddy** got the certificate from Let's Encrypt and renews it by itself before it expires
+  (certificates last 90 days). Renewal needs port 80 open, so leave that rule in the security group.
+  Caddy only answers for our host name, so `https://13.58.35.224` won't work.
+- **gunicorn** listens on `127.0.0.1` only. Port 8000 can't be reached from outside, so every
+  request goes through Caddy.
+- **`wsgi.py`** trusts the `X-Forwarded-*` headers from Caddy (`ProxyFix`), so URLs the app builds,
+  such as a bundle's `download_url`, start with `https://team22.13-58-35-224.sslip.io/system/`.
+- **One worker** because bundles, archives, sessions and reports all live in that one process's
+  memory. A second worker wouldn't see them.
+- **`/system/test/selftest` is off** in production (`404`), because `CRA_ENABLE_SELFTEST` isn't
+  set in the service.
+
+### 7.2 What we have on AWS
+
+Created by `deploy/aws_setup.sh`, all named or tagged `team22-cra`:
+
+| Resource | Details |
+|---|---|
+| Region | **`us-east-2` (Ohio)**. Pick this region in the console, or you won't see any of the resources below. |
+| EC2 instance | `t3.micro` (2 vCPU, 1 GiB RAM), Ubuntu 24.04, 8 GB disk. Standard CPU credits, so a busy CPU slows down instead of costing extra. **Termination protection is on.** |
+| Elastic IP | `13.58.35.224`. It stays the same when the instance is stopped and started, so the URL does too. |
+| Security group | SSH (22) from the IP of the laptop that ran the setup script only; HTTP (80) and HTTPS (443) from anywhere |
+| CloudWatch alarm | `team22-cra-auto-recover`: if AWS's hardware under the instance fails, AWS moves it to new hardware. Same IP, same disk. |
+| Budget | `team22-cra-monthly`: $15/month, emails at 80% of actual spend |
+| SSH key pair | `team22-ec2`. The private key is `~/.ssh/team22-ec2` on Person 3's laptop only. |
+
+Cost: about $11/month (the instance plus the public IPv4 address), paid from the AWS Free plan
+credits.
+
+### 7.3 What is on the server
+
+```
+/home/ubuntu/ECE-30861-Team-22/   the deployed code: a copy of one commit, NOT a git clone
+    VERSION                       which branch@commit is deployed, e.g. person3-bundle-generation@35068a5
+    .venv/                        Python virtual environment with requirements.txt installed
+/etc/systemd/system/cra.service   runs gunicorn at boot and restarts it if it crashes
+/etc/caddy/Caddyfile              team22.13-58-35-224.sslip.io { reverse_proxy 127.0.0.1:8000 }
+```
+
+`deploy/server_setup.sh` rewrites both config files on every deploy, so change the script, not the
+files on the server. There is no `.git` folder on the server, so `git pull` doesn't work there. To
+deploy, use 8.1.
+
+**Nothing is saved to disk.** Bundles, their zip archives, tester sessions and reports are all held
+in memory. A deploy, a reboot or a crash wipes them.
+
+### 7.4 Why EC2
 
 Phase 3 requires both services to be **deployed at a reachable URL** and registered in the class
 spreadsheet. For our code, a host must:
@@ -479,230 +570,131 @@ spreadsheet. For our code, a host must:
 3. **Give us a stable URL**, ideally HTTPS.
 4. **Allow a request to take about 2 minutes.** A tester run waits for the whole suite.
 
-### 7.2 The options
-
-Free-tier terms change often, so check the provider's pricing page before you sign up. The
-details below were checked in October 2026.
+One EC2 `t3.micro` with gunicorn behind Caddy is the simplest setup that meets all four. These are
+the options we compared (checked in October 2026):
 
 | Option | Cost for us | Fits our code? | Notes |
 |---|---|---|---|
-| **AWS EC2** (one small Linux server) | AWS accounts opened since 15 July 2025 get a Free plan with up to **$200 in credits**, for 6 months or until the credits run out. A `t3.micro` plus its public IP is roughly $11/month, so the credits cover the semester. Older accounts may still have 750 free `t2/t3.micro` hours a month for 12 months. | **Yes, best fit.** Always on, one process, full control. | **Recommended.** Step-by-step in Section 8. |
-| **AWS Lightsail** (simplified server) | About 3 months free on one small plan, then from about $5/month | Yes | Same steps as EC2 with a simpler console. A good alternative if EC2 feels like too much. |
-| **AWS Elastic Beanstalk** | Free itself; you pay for the EC2 server it creates | Yes, if set to one instance | Automates the server setup, but adds load-balancer and environment settings to understand. Needs a `Procfile` containing the gunicorn command from 6.6. |
-| **AWS ECS Express Mode** (containers, using our `Dockerfile`) | No fee for Express Mode, but you pay for Fargate compute **and an Application Load Balancer** (the load balancer alone is roughly $16+/month) | Yes, if limited to one task | Gives an HTTPS URL automatically. Burns credits faster. |
+| **AWS EC2** (one small Linux server) | AWS accounts opened since 15 July 2025 get a Free plan with up to **$200 in credits**, for 6 months or until the credits run out. A `t3.micro` plus its public IP is roughly $11/month, so the credits cover the semester. | **Yes, best fit.** Always on, one process, full control. | **What we use.** |
+| **AWS Lightsail** (simplified server) | About 3 months free on one small plan, then from about $5/month | Yes | Same idea as EC2 with a simpler console. |
+| **AWS Elastic Beanstalk** | Free itself; you pay for the EC2 server it creates | Yes, if set to one instance | Adds load-balancer and environment settings to understand. |
+| **AWS ECS Express Mode** (containers) | You pay for Fargate compute **and an Application Load Balancer** (roughly $16+/month for the load balancer alone) | Yes, if limited to one task | Would need a Dockerfile. Burns credits faster. |
 | **AWS App Runner** | — | — | **Not available:** closed to new customers on 30 April 2026. |
-| **AWS Lambda** (serverless) | Very generous free tier | **No.** Each request may hit a different copy, so in-memory sessions get lost. | Would need a database such as DynamoDB for sessions first. |
-| AWS Academy Learner Lab (if the course gives us one) | Free course credits | Partly | Labs end after a few hours, and servers stop with them. The public IP can change at each restart, which breaks the URL we registered. |
-| Render (free web service) | Free | Risky | Sleeps after 15 min idle and takes about a minute to wake. Sleeping wipes our in-memory sessions. |
-| Google Cloud Run | Always-free tier (about 2M requests/month) | Risky | Scales to zero and can start several copies. Set max instances to 1 and accept that idle time clears sessions. |
-| Azure for Students / DigitalOcean (GitHub Student Developer Pack) | Student credits ($100 Azure; DigitalOcean via the pack) | Yes, on a VM | The same idea as EC2 on another cloud. |
-
-**Recommendation:** deploy on **one AWS EC2 `t3.micro` running Ubuntu**, with gunicorn behind
-**Caddy** (a web server that gets a free HTTPS certificate automatically). It is the simplest setup
-that meets all four requirements. Both of our services share it:
-`https://<host>/system` and `https://<host>/tester`.
+| **AWS Lambda** (serverless) | Very generous free tier | **No.** Each request may hit a different copy, so in-memory sessions get lost. | Would need a database for sessions first. |
+| Render (free web service) | Free | Risky | Sleeps after 15 min idle. Sleeping wipes our in-memory sessions. |
+| Google Cloud Run | Always-free tier | Risky | Scales to zero and can start several copies. |
 
 ---
 
-## 8. Deploying on AWS EC2, step by step
+## 8. Deploying and running the server
 
-Expect about 45 minutes the first time. Do this **once for the team**, and share the AWS login
-only through a password manager, never in chat or in the repository.
+All of this needs the SSH key `~/.ssh/team22-ec2`, and your IP has to be allowed in the security
+group (8.3). Right now that means Person 3's laptop.
 
-> **Scripted version (what we actually used).** With the AWS CLI signed in (`aws login`), the
-> steps below are automated by three scripts in `deploy/`:
->
-> - `BUDGET_EMAIL=you@example.com deploy/aws_setup.sh` does 8.1–8.3 in `us-east-2`: SSH key
->   `~/.ssh/team22-ec2`, security group, t3.micro with termination protection and an
->   auto-recovery alarm, Elastic IP, and a $15/month budget.
-> - `deploy/deploy.sh <elastic-ip>` does 8.5–8.8. It sends the current **commit** (the working
->   tree must be clean), runs `deploy/server_setup.sh` on the server (Caddy, systemd), runs the
->   tests there, and restarts the app. The deployed commit is in `VERSION` on the server.
->
-> Our server: `13.58.35.224`, base URL **https://team22.13-58-35-224.sslip.io**
-> (`/system` and `/tester`). Log in with `ssh -i ~/.ssh/team22-ec2 ubuntu@13.58.35.224`. The
-> key is on Person 3's laptop only; to give a teammate access, add their public key to
-> `~/.ssh/authorized_keys` on the server and their IP to the security group.
+### 8.1 Deploy a new version
 
-### 8.1 Protect yourself from surprise bills (5 min)
-
-1. Sign in to the AWS console (https://console.aws.amazon.com).
-2. Search for **Billing and Cost Management → Budgets → Create budget**. Choose the "Zero spend"
-   or "Monthly cost" template and enter your email. AWS will email you before you spend money.
-3. Pick **one region** and always use it, e.g. **US East (N. Virginia) `us-east-1`** (top-right
-   corner of the console). Resources in other regions are invisible but still billed.
-
-### 8.2 Launch the server (10 min)
-
-1. Console → search **EC2** → **Launch instance**.
-2. **Name:** `team22-cra`.
-3. **Application and OS image:** **Ubuntu Server 24.04 LTS** (64-bit x86).
-4. **Instance type:** `t3.micro` (or `t2.micro` if that is the one marked "Free tier eligible").
-5. **Key pair:** *Create new key pair*, name `team22-key`, type RSA, format `.pem`. The browser
-   downloads `team22-key.pem`. **Keep it safe:** it is the only way to log in to the server.
-6. **Network settings → Edit**, and make sure there are three inbound rules:
-   - SSH, port 22, source **My IP**
-   - HTTP, port 80, source **Anywhere (0.0.0.0/0)**
-   - HTTPS, port 443, source **Anywhere (0.0.0.0/0)**
-7. **Storage:** the default 8 GB is enough.
-8. **Launch instance.**
-
-### 8.3 Give it a permanent address (3 min)
-
-A server's public IP changes whenever it is stopped and started, and that would break the URL we
-register. To fix the address:
-
-1. EC2 → **Elastic IPs** → **Allocate Elastic IP address** → **Allocate**.
-2. Select the new IP → **Actions → Associate Elastic IP address** → choose `team22-cra` →
-   **Associate**.
-3. Write the IP down, e.g. `3.91.20.45`. Below it is written as `<IP>`.
-
-> Cost: AWS charges about $0.005/hour (about $3.60/month) for every public IPv4 address. An
-> Elastic IP that is **not attached** to a running server is still charged, so release it when the
-> course ends.
-
-### 8.4 Log in to the server (2 min)
-
-macOS / Linux:
+From the repository on your laptop:
 
 ```bash
-chmod 400 ~/Downloads/team22-key.pem
-ssh -i ~/Downloads/team22-key.pem ubuntu@<IP>
+git checkout <branch to deploy>     # deploy.sh deploys whatever is checked out, not main
+git status                          # must be clean: no changes, no untracked files
+deploy/deploy.sh 13.58.35.224
 ```
 
-Windows PowerShell (OpenSSH is built in):
+What `deploy.sh` does:
 
-```powershell
-ssh -i $HOME\Downloads\team22-key.pem ubuntu@<IP>
-```
+1. Packs the current commit with `git archive HEAD` (only committed files) and writes
+   `branch@commit` into `VERSION`.
+2. Copies it to `/home/ubuntu/ECE-30861-Team-22` with `rsync --delete`. Files that aren't in the
+   commit are removed, except `.venv`.
+3. On the server, runs `deploy/server_setup.sh`. It installs Caddy the first time, and rewrites
+   `cra.service` and the `Caddyfile` every time.
+4. Installs `requirements.txt` into `.venv` and runs `pytest`.
+5. Restarts `cra`, then calls `http://127.0.0.1:8000/` to check it answers.
 
-Type `yes` the first time. You are now typing commands **on the server**. The prompt shows
-`ubuntu@ip-...`.
+It ends with `Deployed <branch>@<commit> to https://team22.13-58-35-224.sslip.io`.
 
-### 8.5 Install the code (5 min)
+Things to know:
 
-On the server:
+- **A restart wipes every bundle, session and report.** Don't deploy while another team is testing
+  us.
+- **If `pytest` fails on the server, the script stops before the restart.** The old version keeps
+  serving, but the new files (and `VERSION`) are already on disk. Any later restart, including the
+  automatic one after a crash or a reboot, would start the new, failing code. Fix the tests and
+  deploy again soon.
+
+Then check the deployment from your laptop (9.1). To see which commit is live:
 
 ```bash
-sudo apt update && sudo apt install -y python3-venv git
-git clone https://github.com/wood297/ECE-30861-Team-22.git
-cd ECE-30861-Team-22
-git checkout main            # or whichever branch we are deploying
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/pytest -q          # sanity check: same result as on your laptop
+ssh -i ~/.ssh/team22-ec2 ubuntu@13.58.35.224 cat ECE-30861-Team-22/VERSION
 ```
 
-If the repository is **private**, `git clone` will ask for a password. Use a GitHub **personal
-access token** (GitHub → Settings → Developer settings → Fine-grained tokens, read-only access to
-this one repository) as the password. Don't save the token in any file in the repository.
+### 8.2 Logs and service commands
 
-### 8.6 Keep the app running with systemd (5 min)
-
-**systemd** is Linux's built-in service manager. It starts our app at boot and restarts it if it
-crashes. Create the service file:
+Log in with `ssh -i ~/.ssh/team22-ec2 ubuntu@13.58.35.224`, then:
 
 ```bash
-sudo tee /etc/systemd/system/cra.service > /dev/null <<'EOF'
-[Unit]
-Description=Team 22 CRA system + tester
-After=network.target
-
-[Service]
-User=ubuntu
-WorkingDirectory=/home/ubuntu/ECE-30861-Team-22
-ExecStart=/home/ubuntu/ECE-30861-Team-22/.venv/bin/gunicorn --workers 1 --threads 8 --timeout 180 --bind 127.0.0.1:8000 wsgi:application
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now cra
-curl http://127.0.0.1:8000/          # -> {"status": "ok", "system": "/system", "tester": "/tester"}
-```
-
-Keep `--workers 1`. More workers would split the in-memory sessions between processes, and a
-session created by `setup` would then be "unknown" when `run` arrives.
-
-### 8.7 Put HTTPS in front with Caddy (10 min)
-
-Caddy receives web traffic on ports 80/443, gets a free HTTPS certificate from Let's Encrypt,
-and passes requests to gunicorn. A certificate needs a domain name. If we don't own one, we can
-use **sslip.io**, a free service where `<IP-with-dashes>.sslip.io` automatically points to that IP.
-For `3.91.20.45` that is `3-91-20-45.sslip.io`.
-
-Install Caddy (official instructions: https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
-
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install -y caddy
-```
-
-Configure it. Replace the host name with yours:
-
-```bash
-sudo tee /etc/caddy/Caddyfile > /dev/null <<'EOF'
-3-91-20-45.sslip.io {
-    reverse_proxy 127.0.0.1:8000
-}
-EOF
-sudo systemctl reload caddy
-```
-
-From **your laptop**, check it works:
-
-```bash
-curl https://3-91-20-45.sslip.io/
-```
-
-If the certificate step fails (`sudo journalctl -u caddy` shows the reason), plain HTTP still works
-and is allowed. Set the first line of the Caddyfile to `:80 {` instead and use `http://<IP>`.
-
-### 8.8 Updating after new code is pushed
-
-On the server:
-
-```bash
-cd ~/ECE-30861-Team-22
-git pull
-.venv/bin/pip install -r requirements.txt     # only needed if requirements.txt changed
-.venv/bin/pytest -q
-sudo systemctl restart cra
-```
-
-A restart clears all sessions and stored reports. Don't redeploy while another team is in the
-middle of testing us.
-
-### 8.9 Watching logs and fixing problems
-
-```bash
-sudo systemctl status cra            # is it running?
+sudo systemctl status cra            # is the app running?
 sudo journalctl -u cra -n 100        # last 100 lines of app logs (errors, tracebacks)
 sudo journalctl -u cra -f            # follow logs live (Ctrl+C to stop)
+sudo systemctl restart cra           # restart the app (wipes in-memory data)
 sudo journalctl -u caddy -n 50       # HTTPS/certificate problems
+curl http://127.0.0.1:8000/          # talk to gunicorn directly, skipping Caddy
 ```
 
-### 8.10 Optional: Docker instead of a venv
+### 8.3 SSH access for you or a teammate
 
-The repository has a `Dockerfile` that runs the same gunicorn command. To use it:
+Port 22 is only open to the IP that `aws_setup.sh` ran from. If you're on a different network, or
+your home IP changed, `ssh` just hangs and times out. Re-running `aws_setup.sh` won't fix it,
+because it skips the security group once it exists. Instead, add your current IP:
 
-1. Install Docker: `sudo apt install -y docker.io`.
-2. Build the image: `sudo docker build -t cra .`
-3. Run it: `sudo docker run -d --restart always -p 127.0.0.1:8000:8000 cra`
+```bash
+MY_IP=$(curl -fsS https://checkip.amazonaws.com)
+aws --region us-east-2 ec2 authorize-security-group-ingress \
+    --group-name team22-cra --protocol tcp --port 22 --cidr "$MY_IP/32"
+```
 
-Use that in place of steps 8.5–8.6. Caddy stays the same. (The Dockerfile hasn't been
-built-tested yet.)
+To give a teammate access:
 
-### 8.11 When the course is over
+1. They create a key with `ssh-keygen -t ed25519` and send you the **public** half (`.pub`).
+2. You append it to `~/.ssh/authorized_keys` on the server.
+3. You add their IP with the command above, using their IP instead of `$MY_IP`.
 
-To stop all charges:
+Never share the private key.
 
-- EC2 → Instances → select → **Instance state → Terminate**.
-- EC2 → Elastic IPs → **Release**.
+### 8.4 Rebuilding from scratch
+
+If the server is lost, run both scripts again:
+
+```bash
+BUDGET_EMAIL=you@example.com deploy/aws_setup.sh   # prints the new IP and URL
+deploy/deploy.sh <new IP>
+```
+
+`aws_setup.sh` is safe to re-run: it skips anything that already exists. A new Elastic IP means a
+new URL (`team22.<new-ip-with-dashes>.sslip.io`). If that happens, update the endpoint registry
+(9.2), tell Team 24, and replace the address in this guide.
+
+### 8.5 When the course is over
+
+Termination protection is on, so turn it off first. Then delete everything so the charges stop:
+
+```bash
+R="--region us-east-2"
+ID=$(aws $R ec2 describe-instances --filters Name=tag:Name,Values=team22-cra \
+     --query 'Reservations[0].Instances[0].InstanceId' --output text)
+aws $R ec2 modify-instance-attribute --instance-id "$ID" --no-disable-api-termination
+aws $R ec2 terminate-instances --instance-ids "$ID"
+aws $R ec2 wait instance-terminated --instance-ids "$ID"
+aws $R ec2 release-address --allocation-id $(aws $R ec2 describe-addresses \
+     --filters Name=tag:Name,Values=team22-cra --query 'Addresses[0].AllocationId' --output text)
+aws $R cloudwatch delete-alarms --alarm-names team22-cra-auto-recover
+aws $R ec2 delete-security-group --group-name team22-cra
+aws $R ec2 delete-key-pair --key-name team22-ec2
+```
+
+An Elastic IP that isn't released is still charged, even after the instance is gone. Delete the
+`team22-cra-monthly` budget last, in Billing and Cost Management → Budgets.
 
 ---
 
@@ -710,11 +702,12 @@ To stop all charges:
 
 ### 9.1 Check the deployment yourself first
 
-From your laptop, using our real base URL (examples use `https://3-91-20-45.sslip.io`):
+From your laptop:
 
 ```bash
-H=https://3-91-20-45.sslip.io
+H=https://team22.13-58-35-224.sslip.io
 
+curl $H/                                                 # {"status": "ok", "system": "/system", "tester": "/tester"}
 curl $H/system/health                                     # {"status":"ok"}
 curl -X POST $H/tester/test/setup -H "Content-Type: application/json" \
      -d "{\"target_url\": \"$H/system\"}"                 # 201 {"session_id": "..."}
@@ -726,15 +719,15 @@ This is our tester grading our own system, which the graders will also do. You c
 from your laptop against the deployed system too:
 
 ```bash
-python -m test_runner --url https://3-91-20-45.sslip.io/system
+python -m test_runner --url https://team22.13-58-35-224.sslip.io/system
 ```
 
 ### 9.2 Fill in our row of the endpoint registry spreadsheet
 
 | Field | What we enter |
 |---|---|
-| **System base URL** | `https://3-91-20-45.sslip.io/system` |
-| **Tester base URL** | `https://3-91-20-45.sslip.io/tester` |
+| **System base URL** | `https://team22.13-58-35-224.sslip.io/system` |
+| **Tester base URL** | `https://team22.13-58-35-224.sslip.io/tester` |
 | **Intra-pod specification URL** | Link to the shared Phase 2 specification (v1.0.0) agreed with Team 24 |
 | **Access / run notes** | "No authentication. Max times: tester setup 70 s, tester run 150 s (typically ~20 s), system setup 5 s. Test data: shared fixtures prd-88 v1.2–v1.4. Sessions are in memory and cleared on redeploy." |
 
@@ -796,4 +789,7 @@ These make cross-team results meaningful. Details are in
 | Tester `/test/run` returns `404` | Unknown session: call `/test/setup` first, or the server restarted and forgot it. |
 | Tester `/test/run` returns `409` | That session already ran. Call `/test/setup` again for a new one. |
 | Tester `/test/setup` returns `500` with `"source": "communication"` | The tester can't reach `target_url`. Check the URL (no trailing `/test`), and that the target is up. On EC2, check the security group allows ports 80/443. |
-| Deployed site doesn't load | Run `sudo systemctl status cra` and `sudo journalctl -u cra -n 100` on the server. Also check the security group, and that the Elastic IP is attached. |
+| Deployed site doesn't load | Check `curl https://team22.13-58-35-224.sslip.io/`. If that fails, run `sudo systemctl status cra` and `sudo journalctl -u cra -n 100` on the server (8.2). Also check, in `us-east-2`, that the instance is running and the Elastic IP is attached. |
+| `ssh` to the server hangs, then times out | Your IP isn't allowed in the security group. Add it (8.3). |
+| `curl https://.../system` returns `308` | The address has no trailing slash. Use `/system/` or `curl -L`. Real endpoints such as `/system/health` are unaffected. |
+| Bundle or session is "not found" right after a deploy | A deploy restarts the app, and that wipes everything in memory. Create it again. |

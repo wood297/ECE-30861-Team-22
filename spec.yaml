@@ -1,0 +1,124 @@
+openapi: 3.0.3
+info:
+  title: Cybersecurity Interceptor Pod API
+  description: HTTP interface for cross-team testing of the CRA technical documentation compilation engine.
+  version: 1.1.0
+servers:
+  - url: http://api.cyberinterceptor.internal/v1
+    description: Pod Cross-Team Testing Server
+paths:
+  /bundles:
+    post:
+      summary: Initiate Release Documentation Bundle Generation
+      operationId: createBundleTask
+      description: Initiates the retrieval of technical documentation artifacts for a specific product and release.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BundleRequest'
+      responses:
+        '202':
+          description: Compilation task successfully queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BundleTaskResponse'
+        '400':
+          description: Invalid request payload.
+  /bundles/{bundle_id}:
+    get:
+      summary: Retrieve Bundle Status, Manifest, and Output
+      operationId: getBundleStatus
+      description: Returns the status of the bundle generation, the generated manifest detailing the collection status of all documentation categories, and a download link to the consolidated artifact bundle.
+      parameters:
+        - name: bundle_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful retrieval of task status, manifest, and/or compiled bundle.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BundleStatusResponse'
+        '404':
+          description: Bundle task ID not found.
+
+components:
+  schemas:
+    BundleRequest:
+      type: object
+      required:
+        - product_id
+        - release_version
+      properties:
+        product_id:
+          type: string
+          description: Unique identifier for the product.
+          example: "prd-88392"
+        release_version:
+          type: string
+          description: Specific version identifier for the product release.
+          example: "v1.2.4"
+
+    BundleTaskResponse:
+      type: object
+      properties:
+        bundle_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: "PENDING"
+
+    ArtifactManifestItem:
+      type: object
+      required:
+        - category
+        - status
+      properties:
+        category:
+          type: string
+          description: The documentation category supported by the common specification (e.g., Risk Assessment, SBOM).
+          example: "Risk Assessment"
+        status:
+          type: string
+          enum: [PRESENT, MISSING, INVALID, INACCESSIBLE]
+          description: The collection status of the specific artifact category.
+        external_source:
+          type: string
+          description: The external system configured and queried for this artifact.
+          example: "Confluence"
+        source_failure_detail:
+          type: string
+          description: Diagnostic description if the source could not be accessed or the artifact was invalid.
+
+    BundleStatusResponse:
+      type: object
+      properties:
+        bundle_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          description: The product identifier associated with this collection.
+        release_version:
+          type: string
+          description: The release version associated with this collection.
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, PARTIAL_SUCCESS, FAILED]
+        manifest:
+          type: array
+          description: A manifest identifying all documentation categories, their collection statuses, and any source failures.
+          items:
+            $ref: '#/components/schemas/ArtifactManifestItem'
+        download_url:
+          type: string
+          format: uri
+          description: Link to the consolidated bundle containing successfully retrieved artifacts with preserved source content.
