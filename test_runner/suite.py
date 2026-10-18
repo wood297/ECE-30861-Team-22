@@ -83,7 +83,7 @@ class Criterion:
         self.fn = fn
 
 
-CRITERIA = []
+CRITERIA: list[Criterion] = []
 
 
 def criterion(criterion_id, title, requirements=(), components=()):

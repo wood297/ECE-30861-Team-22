@@ -6,7 +6,7 @@ from artifact_pipeline import EXPECTED_FILES, retrieve_and_classify
 
 # bundle_id -> zip archive (bytes) of the generated bundle, served by GET /bundles/<id>/download.
 # Kept in memory for Phase 3, so a restart clears it along with the bundles.
-archives = {}
+archives: dict[str, bytes] = {}
 
 # Every entry gets the same timestamp, so identical inputs give byte-identical archives (AC-07)
 ARCHIVE_TIMESTAMP = (1980, 1, 1, 0, 0, 0)

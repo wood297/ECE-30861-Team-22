@@ -35,7 +35,7 @@ app = Flask(__name__)
 
 _lock = threading.Lock()
 # session_id -> {"target_url", "token", "state": ready|running|done|aborted, "report"}
-_sessions = {}
+_sessions: dict[str, dict] = {}
 
 
 def make_client(url, token=None):

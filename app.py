@@ -6,7 +6,7 @@ from bundle_service import archives, process_bundle
 from selftest import create_test_blueprint
 
 app = Flask(__name__)
-bundles = {}
+bundles: dict[str, dict] = {}
 app.register_blueprint(create_test_blueprint())
 
 @app.route("/", methods=["GET"])

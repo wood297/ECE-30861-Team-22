@@ -40,7 +40,7 @@ CODE_COVERAGE_BASIS = ("Source lines; per-session code coverage instrumentation 
                        "yet, so counts are unavailable")
 
 _lock = threading.Lock()
-_sessions = {}
+_sessions: dict[str, dict] = {}
 _last_report = {"report": None}
 
 
