@@ -519,7 +519,7 @@ only through a password manager, never in chat or in the repository.
 >   tree must be clean), runs `deploy/server_setup.sh` on the server (Caddy, systemd), runs the
 >   tests there, and restarts the app. The deployed commit is in `VERSION` on the server.
 >
-> Our server: `13.58.35.224`, base URL **https://13-58-35-224.sslip.io**
+> Our server: `13.58.35.224`, base URL **https://team22.13-58-35-224.sslip.io**
 > (`/system` and `/tester`). Log in with `ssh -i ~/.ssh/team22-ec2 ubuntu@13.58.35.224`. The
 > key is on Person 3's laptop only; to give a teammate access, add their public key to
 > `~/.ssh/authorized_keys` on the server and their IP to the security group.

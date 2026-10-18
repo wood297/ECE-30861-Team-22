@@ -3,10 +3,10 @@
 # Safe to re-run. Installs python venv tooling and Caddy, the cra systemd service, and the
 # Caddyfile for $HOST (an sslip.io name, so Caddy can get a Let's Encrypt certificate).
 #
-#   sudo HOST=13-58-35-224.sslip.io bash server_setup.sh
+#   sudo HOST=team22.13-58-35-224.sslip.io bash server_setup.sh
 set -euo pipefail
 
-: "${HOST:?set HOST to the public host name, e.g. 13-58-35-224.sslip.io}"
+: "${HOST:?set HOST to the public host name, e.g. team22.13-58-35-224.sslip.io}"
 APP_DIR=/home/ubuntu/ECE-30861-Team-22
 
 export DEBIAN_FRONTEND=noninteractive

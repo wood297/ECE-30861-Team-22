@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploy the current commit to the EC2 server (GETTING_STARTED.md §8.8).
 #
-#   deploy/deploy.sh 13.58.35.224
+#   deploy/deploy.sh 13.58.35.224          (HOST=other.name overrides the host name)
 #
 # Only committed code is sent: the working tree must be clean, and the files come from
 # `git archive HEAD`. The commit is written to VERSION on the server. Tests run there before the
@@ -13,7 +13,8 @@ IP="${1:?usage: deploy/deploy.sh <elastic-ip>}"
 KEY_FILE="${KEY_FILE:-$HOME/.ssh/team22-ec2}"
 REMOTE=ubuntu@$IP
 APP_DIR=/home/ubuntu/ECE-30861-Team-22
-HOST="${IP//./-}.sslip.io"
+# sslip.io resolves any name ending in <ip-with-dashes>.sslip.io to that IP; "team22." is our label
+HOST="${HOST:-team22.${IP//./-}.sslip.io}"
 SSH=(ssh -i "$KEY_FILE" -o StrictHostKeyChecking=accept-new)
 
 cd "$(git rev-parse --show-toplevel)"

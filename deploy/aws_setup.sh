@@ -84,4 +84,4 @@ fi
 
 echo
 echo "ssh:  ssh -i $KEY_FILE ubuntu@$PUBLIC_IP"
-echo "url:  https://${PUBLIC_IP//./-}.sslip.io"
+echo "url:  https://team22.${PUBLIC_IP//./-}.sslip.io"
