@@ -5,6 +5,36 @@
 Install requirements with `python -m pip install -r requirements.txt`.
 Run the existing API with `python app.py` and tests with `python -m pytest`.
 
+## Phase 4 Bedrock classification
+
+`bedrock_adapter.BedrockProvider` implements the existing classifier provider
+interface using boto3's Bedrock Converse API. Set `BEDROCK_MODEL_ID` to the team's
+Claude Haiku model ID or inference profile and `AWS_REGION` (with
+`AWS_DEFAULT_REGION` as a fallback). There is no default model version.
+Use the standard AWS credential chain; do not put credentials in source code.
+The AWS identity needs permission to invoke the selected model.
+
+```python
+from artifact_classifier import classify_artifact
+from bedrock_adapter import BedrockProvider
+
+# artifact is an existing successful artifact_formats validation result.
+result = classify_artifact(artifact, "SBOM", BedrockProvider())
+```
+
+The existing classifier validates strict JSON, the four categories, grounded
+evidence, and semantic mismatches. The adapter uses 5-second connection and
+30-second read timeouts, with one total attempt and no automatic retry. These
+are network timeouts, not a total wall-clock deadline. Timeout and provider
+failures remain internal classifier failures; no bundle-status mapping is added.
+Incomplete or unexpected response envelopes fail validation. The adapter emits
+no logs and sanitizes AWS exceptions; do not enable boto3/botocore wire debug
+logging for private artifacts. API and Phase 3 paths are unchanged.
+
+Run mocked tests with `python -m pytest tests/test_bedrock_adapter.py
+tests/test_artifact_classifier.py`. No AWS credentials or calls are needed.
+API reference: [AWS Converse documentation](https://docs.aws.amazon.com/boto3/latest/reference/services/bedrock-runtime/client/converse.html).
+
 ## GitHub authentication increment
 
 This increment provides a reusable read-only GitHub client and a local verification
