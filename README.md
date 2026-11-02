@@ -1,41 +1,100 @@
-# CRA documentation service
+# CRA Documentation Aggregation System
 
-## Run and test
+**ECE 30861 — Team 22 | Phase 4**
 
-Install requirements with `python -m pip install -r requirements.txt`.
-Run the existing API with `python app.py` and tests with `python -m pytest`.
+## Overview
 
-## Phase 4 Bedrock classification
+The CRA Documentation Aggregation System is a Flask-based web service designed to help software teams collect, validate, and package documentation relevant to the EU Cyber Resilience Act (CRA), Regulation (EU) 2024/2847.
 
-`bedrock_adapter.BedrockProvider` implements the existing classifier provider
-interface using boto3's Bedrock Converse API. Set `BEDROCK_MODEL_ID` to the team's
-Claude Haiku model ID or inference profile and `AWS_REGION` (with
-`AWS_DEFAULT_REGION` as a fallback). There is no default model version.
-Use the standard AWS credential chain; do not put credentials in source code.
-The AWS identity needs permission to invoke the selected model.
+The application supports four documentation categories:
 
-```python
-from artifact_classifier import classify_artifact
-from bedrock_adapter import BedrockProvider
+- Software Bill of Materials (SBOM)
+- Risk Assessment
+- Test Logs
+- User Instructions
 
-# artifact is an existing successful artifact_formats validation result.
-result = classify_artifact(artifact, "SBOM", BedrockProvider())
+Given a product ID and release version, the system processes available documentation, generates a manifest identifying missing or invalid artifacts, and packages results into a downloadable ZIP file.
+
+## System Architecture
+
+The Phase 4 system consists of the following components:
+
+| Component | Function |
+|---|---|
+| Flask API | Handles documentation requests and exposes processing results |
+| GitHub Connector | Built and tested for SBOM and User Instructions, but not connected to the service yet (planned for Phase 5) |
+| Format Validator | Validates Markdown, HTML, and CycloneDX JSON/XML |
+| Bedrock Classifier | Uses `openai.gpt-oss-20b` on AWS Bedrock to classify documents with a non-standard name or without the proper heading |
+| Bundle Generator | Creates the documentation manifest and ZIP bundle |
+| Automated Tests | Verify functionality, error handling, and API behavior |
+
+**Processing workflow:**
+
+```text
+User Request (Product ID + Release)
+                |
+                v
+            Flask API
+                |
+                v
+         Local Fixtures
+                |
+                v
+         Format Validation
+                |
+                v
+    Heading Rules, then Bedrock if needed
+                |
+                v
+       Manifest Generation
+                |
+                v
+        Downloadable ZIP
 ```
 
-The existing classifier validates strict JSON, the four categories, grounded
-evidence, and semantic mismatches. The adapter uses 5-second connection and
-30-second read timeouts, with one total attempt and no automatic retry. These
-are network timeouts, not a total wall-clock deadline. Timeout and provider
-failures remain internal classifier failures; no bundle-status mapping is added.
-Incomplete or unexpected response envelopes fail validation. The adapter emits
-no logs and sanitizes AWS exceptions; do not enable boto3/botocore wire debug
-logging for private artifacts. API and Phase 3 paths are unchanged.
+## Document Classification
 
-Run mocked tests with `python -m pytest tests/test_bedrock_adapter.py
-tests/test_artifact_classifier.py`. No AWS credentials or calls are needed.
-API reference: [AWS Converse documentation](https://docs.aws.amazon.com/boto3/latest/reference/services/bedrock-runtime/client/converse.html).
+Files are read from:
 
-## GitHub authentication increment
+```text
+fixtures/{product_id}/{release_version}/
+```
+
+A file with a standard name and the category in its first heading is accepted without calling a model. Bedrock checks standard names without that heading, and identifies other files in a supported format when a category is still missing. Bedrock only proposes a category. Code decides every status, and if Bedrock is off or failing, nothing can become `PRESENT` through it. See `GETTING_STARTED.md` §4.4 for the full rules.
+
+We use `openai.gpt-oss-20b` because our AWS Free plan account has no quota for Claude Haiku on Bedrock.
+
+## API and Deployment
+
+The Flask application implements the team's common API contract for requesting documentation bundles, checking processing status, and retrieving results.
+
+The intended deployed workflow allows users to access the service through a web interface without interacting directly with GitHub or the source code.
+
+**Deployment details:**
+
+- Hosting platform: AWS EC2 (`us-east-2`), deployed automatically by GitHub Actions when a commit on `main` passes CI
+- Service URL: https://team22.13-58-35-224.sslip.io/system
+- Automated test runner: https://team22.13-58-35-224.sslip.io/tester
+- Deployed version: `GET /system/version`
+
+The exact API endpoints and response schemas are defined in the team's OpenAPI specification.
+
+## Testing
+
+Automated tests cover GitHub retrieval, supported file formats, classification behavior, error handling, deployment checks, and processing logic. Run them with `python -m pytest`. They use fake responses and need no credentials.
+
+Live checks are separate and call the real model: `bedrock_live_check.py` and `bedrock_accuracy.py`. On 32 labelled documents run 3 times each, no wrong document was accepted in 96 answers, and 2 calls returned malformed replies. The set is small and written by the team, so it shows the approach works, not how it will do on every real document.
+
+## Known Limitations
+
+- The running service reads from local fixtures. Live GitHub retrieval is planned for Phase 5.
+- CycloneDX validation does not provide full schema certification.
+- Bedrock access depends on external service availability and our account's limits.
+- Deployment uses a stored, tightly scoped AWS key, because our AWS organization's policy doesn't allow GitHub's OIDC sign-in.
+
+## GitHub connector setup
+
+The connector isn't used by the running service yet. Connecting it is planned for Phase 5.
 
 This increment provides a reusable read-only GitHub client and a local verification
 command. It authenticates a server-side personal access token through `GET /user`,
@@ -82,3 +141,13 @@ Run the command above locally for the separate live authentication check.
 References:
 - https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api
 - https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens
+
+## References
+
+- [EU Cyber Resilience Act](https://eur-lex.europa.eu/eli/reg/2024/2847/oj)
+- [GitHub REST API](https://docs.github.com/en/rest)
+- [CycloneDX](https://cyclonedx.org/)
+- [AWS Bedrock](https://docs.aws.amazon.com/bedrock/)
+- [Flask](https://flask.palletsprojects.com/)
+
+**Repository:** https://github.com/wood297/ECE-30861-Team-22
