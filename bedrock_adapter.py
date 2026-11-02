@@ -1,15 +1,18 @@
-"""Bedrock Converse provider for artifact_classifier; no manifest integration.
+"""Amazon Bedrock provider for artifact_classifier; no manifest integration.
 
-Configure BEDROCK_MODEL_ID with the team's Claude Haiku model/inference profile
-and AWS_REGION (or AWS_DEFAULT_REGION). Credentials use boto3's standard chain.
+Calls the OpenAI-compatible bedrock-mantle endpoint, because that's the one our account
+has quota for. Configure BEDROCK_MODEL_ID (for example openai.gpt-oss-20b) and AWS_REGION
+(or AWS_DEFAULT_REGION). Credentials use boto3's standard chain, including an instance role.
 """
 
 import json
 import os
 
 import boto3
-from botocore.config import Config
-from botocore.exceptions import BotoCoreError, ClientError, ConnectTimeoutError, ReadTimeoutError
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.exceptions import BotoCoreError, ConnectTimeoutError, HTTPClientError, ReadTimeoutError
+from botocore.httpsession import URLLib3Session
 
 
 class BedrockProviderError(RuntimeError):
@@ -19,48 +22,55 @@ class BedrockProviderError(RuntimeError):
 class BedrockProvider:
     def __init__(self):
         self.model_id = os.environ.get("BEDROCK_MODEL_ID", "").strip()
-        region = (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "").strip()
-        if not self.model_id or not region:
+        self._region = (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "").strip()
+        if not self.model_id or not self._region:
             raise ValueError("BEDROCK_MODEL_ID and AWS_REGION (or AWS_DEFAULT_REGION) are required")
+        self._url = f"https://bedrock-mantle.{self._region}.api.aws/v1/chat/completions"
         try:
-            self._client = boto3.client(
-                "bedrock-runtime", region_name=region,
-                config=Config(connect_timeout=5, read_timeout=30,
-                              retries={"total_max_attempts": 1, "mode": "standard"}),
-            )
+            self._session = boto3.Session()
+            self._http = URLLib3Session(timeout=(5, 30))
         except Exception:
             raise BedrockProviderError("Bedrock client initialization failed") from None
 
+    def _post(self, body: str):
+        # Read credentials on every call, because instance role credentials rotate
+        credentials = self._session.get_credentials()
+        if credentials is None:
+            raise BedrockProviderError("No AWS credentials available")
+        request = AWSRequest("POST", self._url, data=body, headers={"Content-Type": "application/json"})
+        SigV4Auth(credentials.get_frozen_credentials(), "bedrock-mantle", self._region).add_auth(request)
+        return self._http.send(request.prepare())
+
     def classify(self, *, system_prompt: str, artifact_json: str, response_schema: dict) -> str:
+        # The schema goes in the prompt: response_format produced malformed JSON from this
+        # model in live testing, while asking in the prompt gave valid JSON every time.
+        body = json.dumps({
+            "model": self.model_id,
+            "max_completion_tokens": 2048,
+            "messages": [
+                {"role": "system", "content": system_prompt + "\nresponse_schema: " + json.dumps(response_schema)},
+                {"role": "user", "content": artifact_json},
+            ],
+        })
         try:
-            response = self._client.converse(
-                modelId=self.model_id,
-                system=[{"text": system_prompt + "\nresponse_schema: " + json.dumps(response_schema)}],
-                messages=[{"role": "user", "content": [{"text": artifact_json}]}],
-                inferenceConfig={"maxTokens": 2048, "temperature": 0},
-            )
+            response = self._post(body)
         except (ConnectTimeoutError, ReadTimeoutError):
             raise TimeoutError("Bedrock request timed out") from None
-        except ClientError as error:
-            if error.response.get("Error", {}).get("Code") == "ModelTimeoutException":
-                raise TimeoutError("Bedrock request timed out") from None
+        except (BotoCoreError, HTTPClientError):
             raise BedrockProviderError("Bedrock request failed") from None
-        except BotoCoreError:
-            raise BedrockProviderError("Bedrock request failed") from None
+        if response.status_code != 200:
+            raise BedrockProviderError("Bedrock request failed")
 
-        # Fail closed on truncation, filtering, tool requests or unexpected blocks.
-        # Return invalid JSON for malformed envelopes so the existing classifier
-        # reports malformed_response using its unchanged validation path.
+        # Fail closed on truncation or anything else unexpected. Returning invalid JSON lets
+        # the classifier report malformed_response through its existing validation path.
         try:
-            message = response["output"]["message"]
-            blocks = message["content"]
-            if (response["stopReason"] != "end_turn" or message["role"] != "assistant"
-                    or not isinstance(blocks, list) or not blocks):
+            choice = json.loads(response.content)["choices"][0]
+            message = choice["message"]
+            if message.get("refusal"):
+                raise BedrockProviderError("Bedrock refused the request")
+            text = message["content"]
+            if choice["finish_reason"] != "stop" or not isinstance(text, str) or len(text) > 16_384:
                 return ""
-            if any(not isinstance(block, dict) or set(block) != {"text"}
-                   or not isinstance(block["text"], str) for block in blocks):
-                return ""
-            text = "".join(block["text"] for block in blocks)
-            return text if len(text) <= 16_384 else ""
-        except (KeyError, TypeError):
+            return text
+        except (KeyError, IndexError, TypeError, AttributeError, ValueError):
             return ""

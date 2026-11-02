@@ -82,6 +82,34 @@ if [[ -n "${BUDGET_EMAIL:-}" ]]; then
   echo "budget:         $NAME-monthly (\$$BUDGET_USD, alert at 80% to $BUDGET_EMAIL)"
 fi
 
+# 6. Instance role: lets the server call Bedrock and be reached through SSM, with no stored keys
+ROLE_NAME="$NAME-instance"
+if ! aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
+  aws iam create-role --role-name "$ROLE_NAME" --assume-role-policy-document \
+    '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+fi
+ACCOUNT_ID="$(aws sts get-caller-identity --query Account)"
+# bedrock-mantle scopes this permission to projects, so it can't be limited to one model here
+aws iam put-role-policy --role-name "$ROLE_NAME" --policy-name bedrock-inference --policy-document \
+  "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"bedrock-mantle:CreateInference\",\"Resource\":\"arn:aws:bedrock-mantle:$REGION:$ACCOUNT_ID:project/*\"}]}"
+aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+if ! aws iam get-instance-profile --instance-profile-name "$ROLE_NAME" >/dev/null 2>&1; then
+  aws iam create-instance-profile --instance-profile-name "$ROLE_NAME" >/dev/null
+  aws iam add-role-to-instance-profile --instance-profile-name "$ROLE_NAME" --role-name "$ROLE_NAME"
+fi
+PROFILE_ARN="$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].IamInstanceProfile.Arn')"
+if [[ "$PROFILE_ARN" == "None" ]]; then
+  # A new instance profile takes a few seconds to become usable
+  for attempt in 1 2 3 4 5 6; do
+    aws ec2 associate-iam-instance-profile --instance-id "$INSTANCE_ID" \
+      --iam-instance-profile "Name=$ROLE_NAME" >/dev/null 2>&1 && break
+    [[ "$attempt" == 6 ]] && { echo "could not attach $ROLE_NAME" >&2; exit 1; }
+    sleep 10
+  done
+fi
+echo "instance role:  $ROLE_NAME"
+# end of section 6
+
 echo
 echo "ssh:  ssh -i $KEY_FILE ubuntu@$PUBLIC_IP"
 echo "url:  https://team22.${PUBLIC_IP//./-}.sslip.io"

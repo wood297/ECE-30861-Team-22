@@ -9,7 +9,7 @@ mapping, fixture reads, archive generation, retries or credential setup.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol
+from typing import Protocol, cast
 
 from artifact_classifier import ClassificationResult, LLMProvider, classify_artifact
 from artifact_formats import ValidationResult, validate_artifact
@@ -92,7 +92,7 @@ def process_github_artifacts(product_id: str, release_version: str, *,
                        else ProcessingOutcome.RETRIEVAL_FAILURE)
             results.append(ProcessedArtifact(r, outcome))
             continue
-        validation = validate_artifact(r.original_bytes, r.declared_format)
+        validation = validate_artifact(cast(bytes, r.original_bytes), cast(str, r.declared_format))
         if not validation.valid:
             results.append(ProcessedArtifact(r, ProcessingOutcome.FORMAT_FAILURE, validation))
             continue

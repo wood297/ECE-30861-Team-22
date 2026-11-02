@@ -61,7 +61,8 @@ def test_rejects_invalid_tokens(token):
     assert captured.value.code == "configuration"
 
 
-@pytest.mark.parametrize("repository", ["", "project", "https://github.com/a/b", "a/b/c", "a/..", "a/b?x=1", "a/b#fragment", None])
+@pytest.mark.parametrize("repository", ["", "project", "https://github.com/a/b", "a/b/c", "a/..", "a/b?x=1",
+                                        "a/b#fragment", None])
 def test_rejects_invalid_repository_configuration(repository):
     with pytest.raises(GitHubError):
         GitHubConfig(TOKEN, repository)
@@ -131,7 +132,8 @@ def test_invalid_user_response_does_not_proceed_to_repository(payload):
     assert opener.open.call_count == 1
 
 
-@pytest.mark.parametrize("body", [b"not-json", b"\xff", b"x" * 1_048_577], ids=["invalid-json", "invalid-utf8", "oversized"])
+@pytest.mark.parametrize("body", [b"not-json", b"\xff", b"x" * 1_048_577],
+                         ids=["invalid-json", "invalid-utf8", "oversized"])
 def test_malformed_or_oversized_body(body):
     upstream = response({})
     upstream.read.return_value = body
