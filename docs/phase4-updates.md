@@ -6,10 +6,10 @@ requirement for the Phase 4 report.
 
 | Person | Area | Commits |
 |---|---|---|
-| Cora Wood | GitHub authentication | `daafde9` |
-| Prithika Sundar | GitHub file retrieval, format validation, classifier, first Bedrock adapter, README | `b370384`, `0ead42d`, `c1b39fb` |
-| Ethan Harris | Bedrock on gpt-oss, classification in the pipeline, background processing, automatic deployment | `a69a84f`, `fab72cc`, `1127a43`, `f8693bd`, `430a16b` |
-| Anthony Sharonov | Cross-team testing, AC-05, shared Phase 4 fixtures, GitHub source catalog, spec 1.3.0 | branch `phase4-crossteam` |
+| Person 1 | GitHub authentication | `daafde9` |
+| Person 2 | GitHub file retrieval, format validation, classifier, first Bedrock adapter, README | `b370384`, `0ead42d`, `c1b39fb` |
+| Person 3 | Bedrock on gpt-oss, classification in the pipeline, background processing, automatic deployment | `a69a84f`, `fab72cc`, `1127a43`, `f8693bd`, `430a16b` |
+| Person 4 | Cross-team testing, AC-05, shared Phase 4 fixtures, GitHub source catalog, spec 1.3.0 | branch `phase4-crossteam` |
 
 ## Cora: GitHub authentication (`daafde9`)
 
