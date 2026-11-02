@@ -29,11 +29,16 @@ class GitHubConfig:
     token: str = field(repr=False)
     repository: str
     timeout: float = 10.0
+    # Public repositories can be read without a token (GitHub allows 60 requests/hour per IP).
+    # Only file reads use this; verify_access always needs a token.
+    allow_anonymous: bool = False
 
     def __post_init__(self):
-        if not isinstance(self.token, str) or not self.token.strip():
+        if not isinstance(self.token, str):
             raise GitHubError("configuration", "Set GITHUB_TOKEN before verifying access.")
-        if any(character.isspace() for character in self.token):
+        if not self.token.strip() and not self.allow_anonymous:
+            raise GitHubError("configuration", "Set GITHUB_TOKEN before verifying access.")
+        if self.token and any(character.isspace() for character in self.token):
             raise GitHubError("configuration", "GITHUB_TOKEN must not contain whitespace.")
         if not isinstance(self.repository, str) or not re.fullmatch(
             r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9_.-]+",
@@ -65,16 +70,14 @@ class GitHubClient:
         self._opener = opener if opener is not None else build_opener(_NoRedirect())
 
     def _get(self, path):
-        request = Request(
-            "https://api.github.com" + path,
-            headers={
-                "Authorization": "Bearer " + self.config.token,
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "cra-documentation-service",
-            },
-            method="GET",
-        )
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "cra-documentation-service",
+        }
+        if self.config.token:
+            headers["Authorization"] = "Bearer " + self.config.token
+        request = Request("https://api.github.com" + path, headers=headers, method="GET")
         try:
             with self._opener.open(request, timeout=self.config.timeout) as response:
                 # Bound memory consumption and reject malformed upstream responses.
@@ -194,6 +197,8 @@ class GitHubClient:
 
         Metadata access does not establish permission to download repository files.
         """
+        if not self.config.token:
+            raise GitHubError("configuration", "Set GITHUB_TOKEN before verifying access.")
         user = self._get("/user")
         if not isinstance(user.get("login"), str) or not user["login"]:
             raise GitHubError("upstream_response", "GitHub did not return an authenticated user.")

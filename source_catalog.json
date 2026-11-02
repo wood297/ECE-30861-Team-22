@@ -1,0 +1,14 @@
+{
+  "description": "Where each category comes from, per product and release. Anything not listed here is read from fixtures/<product>/<release>/ as before. GitHub entries name one file at a pinned commit; if that file is not there, the category is INACCESSIBLE (matches Team 24's Phase 4 behavior).",
+  "releases": {
+    "prd-88/v1.2-github-inaccessible": {
+      "Test Logs": {
+        "source": "github",
+        "repository": "prithika-sundar/cra-artifact-test",
+        "commit": "f6d381dc6ddb716e1603230a85ea300de462d252",
+        "path": "artifacts/prd-88/v1.2-github-inaccessible/test_logs.md",
+        "format": "markdown"
+      }
+    }
+  }
+}

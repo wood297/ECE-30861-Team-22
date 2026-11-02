@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 770" width="960" height="770" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#1d2530" stroke-width="1.3"/>
+    </marker>
+  </defs>
+  <style>
+    .cls { fill: #ffffff; stroke: #1d2530; stroke-width: 1.4; }
+    .div { stroke: #1d2530; stroke-width: 1.2; }
+    .note { fill: #fbfaf3; stroke: #8a8f98; stroke-width: 1; }
+    .e { stroke: #1d2530; stroke-width: 1.3; fill: none; }
+    .dash { stroke: #8a8f98; stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+    .name { font-size: 14px; font-weight: bold; fill: #1d2530; }
+    .st { font-size: 11px; fill: #5b6675; }
+    .a { font-family: Menlo, Consolas, monospace; font-size: 12px; fill: #1d2530; }
+    .n { font-size: 11.5px; fill: #3d4652; }
+    .lbl { font-size: 12px; fill: #1d2530; }
+    .mul { font-size: 12px; fill: #1d2530; font-family: Menlo, Consolas, monospace; }
+    .title { font-size: 15px; font-weight: bold; fill: #1d2530; }
+    .ink { fill: #1d2530; }
+  </style>
+  <rect width="960" height="770" fill="#ffffff"/>
+  <text class="title" x="24" y="28">Bundle data model · UML class diagram · as delivered (Phase 3)</text>
+
+  <g transform="translate(0,40)">
+    <!-- storage note -->
+    <path class="note" d="M24,10 H278 L292,24 V86 H24 Z"/>
+    <path class="note" d="M278,10 V24 H292" fill="none"/>
+    <text class="n" x="34" y="30">Storage: Python dictionaries in memory,</text>
+    <text class="n" x="34" y="45">cleared on restart: bundles (app.py),</text>
+    <text class="n" x="34" y="60">archives (bundle_service.py),</text>
+    <text class="n" x="34" y="75">_sessions (selftest.py).</text>
+
+    <!-- Bundle -->
+    <rect class="cls" x="330" y="10" width="300" height="132"/>
+    <line class="div" x1="330" y1="40" x2="630" y2="40"/>
+    <text class="name" x="480" y="30" text-anchor="middle">Bundle</text>
+    <text class="a" x="342" y="58">bundle_id : UUID</text>
+    <text class="a" x="342" y="76">product_id : str</text>
+    <text class="a" x="342" y="94">release_version : str</text>
+    <text class="a" x="342" y="112">status : BundleStatus</text>
+    <text class="a" x="342" y="130">error : str [0..1]</text>
+
+    <!-- composition: manifest -->
+    <polygon class="ink" points="390,142 397,152 390,162 383,152"/>
+    <polyline class="e" points="390,162 390,200 170,200 170,250"/>
+    <text class="lbl" x="280" y="193" text-anchor="middle">records</text>
+    <text class="mul" x="398" y="178">1</text>
+    <text class="mul" x="162" y="242" text-anchor="end">0..4</text>
+    <text class="lbl" x="178" y="242">manifest</text>
+
+    <!-- composition: artifacts -->
+    <polygon class="ink" points="570,142 577,152 570,162 563,152"/>
+    <polyline class="e" points="570,162 570,200 790,200 790,250"/>
+    <text class="lbl" x="680" y="193" text-anchor="middle">contains</text>
+    <text class="mul" x="578" y="178">1</text>
+    <text class="mul" x="782" y="242" text-anchor="end">0..4</text>
+    <text class="lbl" x="798" y="242">artifacts</text>
+
+    <!-- association: archive -->
+    <line class="e" x1="480" y1="142" x2="480" y2="248" marker-end="url(#open)"/>
+    <text class="mul" x="488" y="158">1</text>
+    <text class="lbl" x="488" y="198">packaged as</text>
+    <text class="mul" x="488" y="242">0..1</text>
+
+    <!-- ManifestItem -->
+    <rect class="cls" x="30" y="250" width="280" height="114"/>
+    <line class="div" x1="30" y1="280" x2="310" y2="280"/>
+    <text class="name" x="170" y="270" text-anchor="middle">ManifestItem</text>
+    <text class="a" x="42" y="298">category : Category</text>
+    <text class="a" x="42" y="316">status : CategoryStatus</text>
+    <text class="a" x="42" y="334">external_source : str</text>
+    <text class="a" x="42" y="352">source_failure_detail : str [0..1]</text>
+
+    <!-- BundleArchive -->
+    <rect class="cls" x="340" y="250" width="280" height="78"/>
+    <line class="div" x1="340" y1="280" x2="620" y2="280"/>
+    <text class="name" x="480" y="270" text-anchor="middle">BundleArchive</text>
+    <text class="a" x="352" y="298">filename : str</text>
+    <text class="a" x="352" y="316">data : bytes (zip)</text>
+
+    <!-- Artifact -->
+    <rect class="cls" x="650" y="250" width="280" height="114"/>
+    <line class="div" x1="650" y1="280" x2="930" y2="280"/>
+    <text class="name" x="790" y="270" text-anchor="middle">Artifact</text>
+    <text class="a" x="662" y="298">category : Category</text>
+    <text class="a" x="662" y="316">product_id : str</text>
+    <text class="a" x="662" y="334">release_version : str</text>
+    <text class="a" x="662" y="352">content : str</text>
+
+    <!-- constraint notes -->
+    <line class="dash" x1="170" y1="364" x2="170" y2="392"/>
+    <path class="note" d="M30,392 H296 L310,406 V498 H30 Z"/>
+    <path class="note" d="M296,392 V406 H310" fill="none"/>
+    <text class="n" x="40" y="411">{exactly one item per Category;</text>
+    <text class="n" x="40" y="426"> none when Bundle.status = FAILED}</text>
+    <text class="n" x="40" y="445">{external_source = "fixtures" in Phase 3;</text>
+    <text class="n" x="40" y="460"> GitHub, Jenkins, Jira in Phase 4}</text>
+    <text class="n" x="40" y="479">{source_failure_detail only for</text>
+    <text class="n" x="40" y="494"> INVALID and INACCESSIBLE}</text>
+
+    <line class="dash" x1="480" y1="328" x2="480" y2="392"/>
+    <path class="note" d="M340,392 H606 L620,406 V498 H340 Z"/>
+    <path class="note" d="M606,392 V406 H620" fill="none"/>
+    <text class="n" x="350" y="411">{exists only for COMPLETED and</text>
+    <text class="n" x="350" y="426"> PARTIAL_SUCCESS; holds each PRESENT</text>
+    <text class="n" x="350" y="441"> file unchanged + manifest.json without</text>
+    <text class="n" x="350" y="456"> bundle_id; filename bundle-&lt;id&gt;.zip}</text>
+
+    <line class="dash" x1="790" y1="364" x2="790" y2="392"/>
+    <path class="note" d="M650,392 H916 L930,406 V498 H650 Z"/>
+    <path class="note" d="M916,392 V406 H930" fill="none"/>
+    <text class="n" x="660" y="411">{one Artifact per PRESENT item;</text>
+    <text class="n" x="660" y="426"> product_id and release_version equal</text>
+    <text class="n" x="660" y="441"> the Bundle's; content is the file's</text>
+    <text class="n" x="660" y="456"> text, unmodified}</text>
+
+    <!-- enumerations -->
+    <g transform="translate(0,30)">
+    <rect class="cls" x="30" y="510" width="210" height="136"/>
+    <line class="div" x1="30" y1="550" x2="240" y2="550"/>
+    <text class="st" x="135" y="526" text-anchor="middle">«enumeration»</text>
+    <text class="name" x="135" y="543" text-anchor="middle">BundleStatus</text>
+    <text class="a" x="42" y="568">PENDING</text>
+    <text class="a" x="42" y="585">PROCESSING</text>
+    <text class="a" x="42" y="602">COMPLETED</text>
+    <text class="a" x="42" y="619">PARTIAL_SUCCESS</text>
+    <text class="a" x="42" y="636">FAILED</text>
+
+    <rect class="cls" x="262" y="510" width="210" height="119"/>
+    <line class="div" x1="262" y1="550" x2="472" y2="550"/>
+    <text class="st" x="367" y="526" text-anchor="middle">«enumeration»</text>
+    <text class="name" x="367" y="543" text-anchor="middle">CategoryStatus</text>
+    <text class="a" x="274" y="568">PRESENT</text>
+    <text class="a" x="274" y="585">MISSING</text>
+    <text class="a" x="274" y="602">INVALID</text>
+    <text class="a" x="274" y="619">INACCESSIBLE</text>
+
+    <rect class="cls" x="494" y="510" width="210" height="119"/>
+    <line class="div" x1="494" y1="550" x2="704" y2="550"/>
+    <text class="st" x="599" y="526" text-anchor="middle">«enumeration»</text>
+    <text class="name" x="599" y="543" text-anchor="middle">Category</text>
+    <text class="a" x="506" y="568">SBOM</text>
+    <text class="a" x="506" y="585">Risk Assessment</text>
+    <text class="a" x="506" y="602">Test Logs</text>
+    <text class="a" x="506" y="619">User Instructions</text>
+
+    <rect class="cls" x="726" y="510" width="210" height="96"/>
+    <line class="div" x1="726" y1="540" x2="936" y2="540"/>
+    <text class="name" x="831" y="530" text-anchor="middle">TestSession</text>
+    <text class="a" x="738" y="558">session_id : str</text>
+    <text class="a" x="738" y="576">created_at : datetime</text>
+    <text class="a" x="738" y="594">setup : object</text>
+    <text class="n" x="831" y="626" text-anchor="middle">selftest.py · not linked to bundles</text>
+    </g>
+  </g>
+</svg>

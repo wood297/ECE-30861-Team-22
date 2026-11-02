@@ -4,6 +4,10 @@ Listing files and deciding are separate on purpose: decide() never touches the f
 knows where files came from, so another source only needs its own version of
 list_fixture_files(). Bedrock only proposes a category, for valid files with a non-standard
 name or without the proper heading. Code decides every status.
+
+source_catalog.json can point a category at one file in a GitHub repository at a pinned commit.
+That file goes through the same rules as a local one. If GitHub can't supply it, the category
+is INACCESSIBLE, matching Team 24's Phase 4 behavior.
 """
 import hashlib
 import json
@@ -19,12 +23,18 @@ from pathlib import Path, PurePath
 from artifact_classifier import CATEGORIES, RESPONSE_SCHEMA, SYSTEM_PROMPT, LLMProvider, classify_artifact
 from artifact_formats import ValidationResult, validate_artifact
 from bedrock_adapter import BedrockProvider, BedrockProviderError
+from github_artifact_retrieval import EXTERNAL_SOURCE as GITHUB_SOURCE
+from github_artifact_retrieval import RetrievalResult, fetch_configured_artifact
+from github_client import GitHubClient, GitHubConfig
 
 logger = logging.getLogger(__name__)
 
 FIXTURES_ROOT = Path(__file__).parent / "fixtures"
-# Reported as external_source on every manifest item; Phase 4 still has this one controlled source
+CATALOG_PATH = Path(__file__).parent / "source_catalog.json"
+# Reported as external_source on manifest items read from the local fixtures folder
 SOURCE_NAME = "fixtures"
+# Short, so a slow GitHub can't hold up a bundle for long
+GITHUB_TIMEOUT = 3.0
 
 # category name -> the Markdown file we expect to find for it
 EXPECTED_FILES = {
@@ -86,6 +96,34 @@ _proposals_lock = threading.Lock()
 def clear_proposal_cache():
     with _proposals_lock:
         _proposals.clear()
+
+
+def load_catalog(path: Path = CATALOG_PATH) -> dict:
+    """{"<product>/<release>": {category: entry}} for categories that don't come from fixtures."""
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8")).get("releases", {})
+
+
+CATALOG = load_catalog()
+
+# (repository, commit, path) -> RetrievalResult. A pinned commit never changes, so a found file
+# or a confirmed absence is cached; temporary failures (timeouts, rate limits) are not.
+_github_cache: dict[tuple[str, str, str], RetrievalResult] = {}
+_github_lock = threading.Lock()
+
+
+def clear_github_cache():
+    with _github_lock:
+        _github_cache.clear()
+
+
+def make_github_client(repository: str) -> GitHubClient:
+    """Real client for a catalog's repository. Uses GITHUB_TOKEN when set, otherwise reads
+    anonymously, which works for public repositories. Tests replace this function."""
+    config = GitHubConfig(token=os.environ.get("GITHUB_TOKEN", ""), repository=repository,
+                          timeout=GITHUB_TIMEOUT, allow_anonymous=True)
+    return GitHubClient(config)
 
 
 @lru_cache(maxsize=1)
@@ -301,6 +339,28 @@ def decide(files: list[SourceFile], provider: LLMProvider | None) -> dict[str, D
     return {category: decisions.get(category, Decision("MISSING")) for category in EXPECTED_FILES}
 
 
+def decide_github(entry: dict, category: str, product: str, release: str,
+                  provider: LLMProvider | None) -> Decision:
+    """Decide a category that source_catalog.json says lives in a GitHub repository."""
+    name = PurePath(entry["path"]).name
+    if _format_of(name) is None:
+        return Decision("INVALID", name, detail=f"Unsupported file format: {name}")
+    key = (entry["repository"], entry["commit"], entry["path"])
+    with _github_lock:
+        result = _github_cache.get(key)
+    if result is None:
+        result = fetch_configured_artifact(
+            make_github_client(entry["repository"]), category=category, product_id=product,
+            release_version=release, path=entry["path"], revision=entry["commit"],
+            declared_format=_format_of(name) or "markdown")
+        if result.outcome == "RETRIEVED" or result.error_code == "not_found":
+            with _github_lock:
+                _github_cache[key] = result
+    if result.outcome != "RETRIEVED":
+        return Decision("INACCESSIBLE", name, detail=result.source_failure_detail)
+    return _decide_standard_file(SourceFile(name, data=result.original_bytes), category, provider)
+
+
 def list_fixture_files(product: str, release: str) -> list[SourceFile] | None:
     """Every file directly in the release's folder, or None when the folder doesn't exist."""
     folder = FIXTURES_ROOT / product / release
@@ -334,10 +394,18 @@ def retrieve_and_classify(bundle):
         bundle["status"] = "FAILED"
         return bundle
 
+    provider = get_provider()
+    decisions = decide(files, provider)
+    sources = {category: SOURCE_NAME for category in decisions}
+    for category, entry in CATALOG.get(f"{product}/{release}", {}).items():
+        if entry.get("source") == "github" and category in decisions:
+            decisions[category] = decide_github(entry, category, product, release, provider)
+            sources[category] = GITHUB_SOURCE
+
     artifacts = []
     manifest = []
-    for category, decision in decide(files, get_provider()).items():
-        item = {"category": category, "status": decision.status, "external_source": SOURCE_NAME}
+    for category, decision in decisions.items():
+        item = {"category": category, "status": decision.status, "external_source": sources[category]}
         if decision.detail:
             item["source_failure_detail"] = decision.detail
         if decision.source_file:

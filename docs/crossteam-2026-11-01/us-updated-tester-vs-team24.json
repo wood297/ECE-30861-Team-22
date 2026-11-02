@@ -1,0 +1,875 @@
+{
+  "session_id": "f9ddee40-9263-4909-a58a-5f27fcc60331",
+  "target_url": "https://30861-p3.jscarfo.com",
+  "results": [
+    {
+      "test_id": "API-01",
+      "outcome": "pass",
+      "message": "POST /bundles acknowledges a valid request with 202, a UUID bundle_id and PENDING. All observable checks passed (4).",
+      "title": "POST /bundles acknowledges a valid request with 202, a UUID bundle_id and PENDING",
+      "requirements": [
+        "REQ-01"
+      ],
+      "components": [
+        "request-intake"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "bundle_id is a UUID",
+          "passed": true,
+          "detail": "07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c"
+        },
+        {
+          "description": "initial status is PENDING",
+          "passed": true,
+          "detail": "got 'PENDING'"
+        }
+      ],
+      "duration_ms": 506.4
+    },
+    {
+      "test_id": "API-02",
+      "outcome": "pass",
+      "message": "POST /bundles rejects requests missing a required field with 400. All observable checks passed (3).",
+      "title": "POST /bundles rejects requests missing a required field with 400",
+      "requirements": [
+        "REQ-01"
+      ],
+      "components": [
+        "request-intake"
+      ],
+      "checks": [
+        {
+          "description": "missing product_id: 400 with an 'error' message",
+          "passed": true,
+          "detail": "HTTP 400: {\"error\": \"Missing required field: 'product_id'\"}"
+        },
+        {
+          "description": "missing release_version: 400 with an 'error' message",
+          "passed": true,
+          "detail": "HTTP 400: {\"error\": \"Missing required field: 'release_version'\"}"
+        },
+        {
+          "description": "neither identifier: 400 with an 'error' message",
+          "passed": true,
+          "detail": "HTTP 400: {\"error\": \"Missing required field: 'product_id'\"}"
+        }
+      ],
+      "duration_ms": 782.6
+    },
+    {
+      "test_id": "API-03",
+      "outcome": "pass",
+      "message": "POST /bundles enforces field constraints (non-empty strings, JSON body). All observable checks passed (4).",
+      "title": "POST /bundles enforces field constraints (non-empty strings, JSON body)",
+      "requirements": [
+        "REQ-01"
+      ],
+      "components": [
+        "request-intake"
+      ],
+      "checks": [
+        {
+          "description": "empty product_id: 400",
+          "passed": true,
+          "detail": "HTTP 400"
+        },
+        {
+          "description": "blank release_version: 400",
+          "passed": true,
+          "detail": "HTTP 400"
+        },
+        {
+          "description": "non-string product_id: 400",
+          "passed": true,
+          "detail": "HTTP 400"
+        },
+        {
+          "description": "non-JSON body: 4xx client error",
+          "passed": true,
+          "detail": "HTTP 400"
+        }
+      ],
+      "duration_ms": 848.2
+    },
+    {
+      "test_id": "API-04",
+      "outcome": "pass",
+      "message": "GET /bundles/{bundle_id} returns 404 for an unknown bundle. All observable checks passed (1).",
+      "title": "GET /bundles/{bundle_id} returns 404 for an unknown bundle",
+      "requirements": [
+        "REQ-04"
+      ],
+      "components": [
+        "status-retrieval"
+      ],
+      "checks": [
+        {
+          "description": "unknown UUID: 404",
+          "passed": true,
+          "detail": "HTTP 404"
+        }
+      ],
+      "duration_ms": 155.5
+    },
+    {
+      "test_id": "API-05",
+      "outcome": "pass",
+      "message": "GET /bundles/{bundle_id} conforms to BundleStatusResponse. All observable checks passed (9).",
+      "title": "GET /bundles/{bundle_id} conforms to BundleStatusResponse",
+      "requirements": [
+        "REQ-03",
+        "REQ-04",
+        "REQ-05"
+      ],
+      "components": [
+        "status-retrieval",
+        "manifest-generation"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "bundle_id matches the created bundle",
+          "passed": true,
+          "detail": "got '07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c'"
+        },
+        {
+          "description": "product_id echoes the request",
+          "passed": true,
+          "detail": "got 'prd-88'"
+        },
+        {
+          "description": "release_version echoes the request",
+          "passed": true,
+          "detail": "got 'v1.2'"
+        },
+        {
+          "description": "status is in the BundleStatusResponse enum",
+          "passed": true,
+          "detail": "got 'COMPLETED'"
+        },
+        {
+          "description": "manifest is a list",
+          "passed": true,
+          "detail": "got list"
+        },
+        {
+          "description": "every manifest item has a category and a status in the ArtifactManifestItem enum",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "download_url is a string",
+          "passed": true,
+          "detail": "got 'https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip'"
+        }
+      ],
+      "duration_ms": 0.2
+    },
+    {
+      "test_id": "API-06",
+      "outcome": "pass",
+      "message": "A bundle reaches a terminal status (COMPLETED, PARTIAL_SUCCESS, FAILED). All observable checks passed (3).",
+      "title": "A bundle reaches a terminal status (COMPLETED, PARTIAL_SUCCESS, FAILED)",
+      "requirements": [
+        "REQ-05"
+      ],
+      "components": [
+        "manifest-generation"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "terminal status reached within 5.0s",
+          "passed": true,
+          "detail": "last status 'COMPLETED'"
+        }
+      ],
+      "duration_ms": 0.1
+    },
+    {
+      "test_id": "API-07",
+      "outcome": "pass",
+      "message": "An unknown release is not reported as collected. All observable checks passed (4).",
+      "title": "An unknown release is not reported as collected",
+      "requirements": [
+        "REQ-01",
+        "REQ-06"
+      ],
+      "components": [
+        "request-intake",
+        "artifact-retrieval"
+      ],
+      "checks": [
+        {
+          "description": "GET /bundles/{bundle_id} returns 200",
+          "passed": true,
+          "detail": "HTTP 200"
+        },
+        {
+          "description": "bundle is not COMPLETED",
+          "passed": true,
+          "detail": "got 'FAILED'"
+        },
+        {
+          "description": "no category is PRESENT",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "no artifact content is included",
+          "passed": true,
+          "detail": null
+        }
+      ],
+      "duration_ms": 454.2
+    },
+    {
+      "test_id": "AC-01",
+      "outcome": "pass",
+      "message": "Release identification: artifacts belong to the requested release. All observable checks passed (21).",
+      "title": "Release identification: artifacts belong to the requested release",
+      "requirements": [
+        "REQ-01",
+        "REQ-04"
+      ],
+      "components": [
+        "artifact-retrieval"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "prd-88 v1.2: bundle records the requested product_id and release_version",
+          "passed": true,
+          "detail": "got ('prd-88', 'v1.2')"
+        },
+        {
+          "description": "POST /bundles for prd-88 v1.3 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.3 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/f9bfaf88-68a3-4e01-aeee-fe2a7e81c569.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "prd-88 v1.3: bundle records the requested product_id and release_version",
+          "passed": true,
+          "detail": "got ('prd-88', 'v1.3')"
+        },
+        {
+          "description": "POST /bundles for prd-88 v2.0 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"71152567-28c8-446b-8222-565bc910ab0e\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v2.0 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"71152567-28c8-446b-8222-565bc910ab0e\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/71152567-28c8-446b-8222-565bc910ab0e.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "prd-88 v2.0: bundle records the requested product_id and release_version",
+          "passed": true,
+          "detail": "got ('prd-88', 'v2.0')"
+        },
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "prd-88 v1.2: no artifact from v1.3 is included",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "POST /bundles for prd-88 v1.3 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.3 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/f9bfaf88-68a3-4e01-aeee-fe2a7e81c569.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "prd-88 v1.3: no artifact from v1.2 is included",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "prd-88 v1.2: no artifact from v2.0 is included",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "POST /bundles for prd-88 v2.0 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"71152567-28c8-446b-8222-565bc910ab0e\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v2.0 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"71152567-28c8-446b-8222-565bc910ab0e\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/71152567-28c8-446b-8222-565bc910ab0e.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "prd-88 v2.0: no artifact from v1.2 is included",
+          "passed": true,
+          "detail": null
+        }
+      ],
+      "duration_ms": 1785.8
+    },
+    {
+      "test_id": "AC-02",
+      "outcome": "pass",
+      "message": "Complete artifact collection: every category PRESENT and bundle COMPLETED. All observable checks passed (7).",
+      "title": "Complete artifact collection: every category PRESENT and bundle COMPLETED",
+      "requirements": [
+        "REQ-02",
+        "REQ-03",
+        "REQ-05"
+      ],
+      "components": [
+        "artifact-retrieval",
+        "classification",
+        "manifest-generation"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "manifest reports 'SBOM' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'Risk Assessment' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'Test Logs' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'User Instructions' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "bundle status is COMPLETED",
+          "passed": true,
+          "detail": "got 'COMPLETED'"
+        }
+      ],
+      "duration_ms": 0.1
+    },
+    {
+      "test_id": "AC-03",
+      "outcome": "pass",
+      "message": "Missing required artifact is reported as MISSING. All observable checks passed (7); 1 not observable through this interface.",
+      "title": "Missing required artifact is reported as MISSING",
+      "requirements": [
+        "REQ-03",
+        "REQ-06"
+      ],
+      "components": [
+        "classification"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.3 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.3 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/f9bfaf88-68a3-4e01-aeee-fe2a7e81c569.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "manifest reports 'SBOM' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'Risk Assessment' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'Test Logs' exactly once as MISSING",
+          "passed": true,
+          "detail": "got ['MISSING']"
+        },
+        {
+          "description": "manifest reports 'User Instructions' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "bundle is not reported as COMPLETED",
+          "passed": true,
+          "detail": "got 'PARTIAL_SUCCESS'"
+        },
+        {
+          "description": "no collected artifact is labelled 'Test Logs'",
+          "passed": null,
+          "detail": "bundle does not expose per-category artifact content"
+        }
+      ],
+      "duration_ms": 0.1
+    },
+    {
+      "test_id": "AC-04",
+      "outcome": "pass",
+      "message": "Invalid artifact is reported as INVALID and not treated as collected. All observable checks passed (7); 1 not observable through this interface.",
+      "title": "Invalid artifact is reported as INVALID and not treated as collected",
+      "requirements": [
+        "REQ-03",
+        "REQ-06"
+      ],
+      "components": [
+        "classification"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.4 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"136a7350-f682-4a68-8cec-7ee67f628dc6\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.4 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"136a7350-f682-4a68-8cec-7ee67f628dc6\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/136a7350-f682-4a68-8cec-7ee67f628dc6.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "manifest reports 'SBOM' exactly once as INVALID",
+          "passed": true,
+          "detail": "got ['INVALID']"
+        },
+        {
+          "description": "manifest reports 'Risk Assessment' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'Test Logs' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'User Instructions' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "bundle is not reported as COMPLETED",
+          "passed": true,
+          "detail": "got 'PARTIAL_SUCCESS'"
+        },
+        {
+          "description": "no collected artifact is labelled 'SBOM'",
+          "passed": null,
+          "detail": "bundle does not expose per-category artifact content"
+        }
+      ],
+      "duration_ms": 645.8
+    },
+    {
+      "test_id": "AC-05",
+      "outcome": "pass",
+      "message": "External source failure is reported as INACCESSIBLE. All observable checks passed (11); 1 not observable through this interface.",
+      "title": "External source failure is reported as INACCESSIBLE",
+      "requirements": [
+        "REQ-02",
+        "REQ-06",
+        "REQ-07"
+      ],
+      "components": [
+        "source-failure-handling"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2-github-inaccessible returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"6dcba199-59e3-4b46-b766-5ad4479d130f\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2-github-inaccessible returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"6dcba199-59e3-4b46-b766-5ad4479d130f\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/6dcba199-59e3-4b46-b766-5ad4479d130f.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "manifest reports 'SBOM' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'Risk Assessment' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "manifest reports 'Test Logs' exactly once as INACCESSIBLE",
+          "passed": true,
+          "detail": "got ['INACCESSIBLE']"
+        },
+        {
+          "description": "manifest reports 'User Instructions' exactly once as PRESENT",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "REQ-07: a partial source failure gives PARTIAL_SUCCESS (neither COMPLETED nor FAILED)",
+          "passed": true,
+          "detail": "got 'PARTIAL_SUCCESS'"
+        },
+        {
+          "description": "REQ-07: the Test Logs entry explains which source or artifact failed (source_failure_detail)",
+          "passed": true,
+          "detail": "got 'Configured GitHub artifact was not found at the pinned commit.'"
+        },
+        {
+          "description": "no collected artifact is labelled 'Test Logs'",
+          "passed": null,
+          "detail": "bundle does not expose per-category artifact content"
+        },
+        {
+          "description": "REQ-07: the partial bundle still has a download_url",
+          "passed": true,
+          "detail": "got 'https://30861-p3.jscarfo.com/downloads/6dcba199-59e3-4b46-b766-5ad4479d130f.zip'"
+        },
+        {
+          "description": "the bundle still exposes the evidence that was retrieved",
+          "passed": true,
+          "detail": "neither artifacts[].content nor a usable download_url found"
+        },
+        {
+          "description": "all 3 artifacts from the working source are kept unchanged",
+          "passed": true,
+          "detail": null
+        }
+      ],
+      "duration_ms": 1164.0
+    },
+    {
+      "test_id": "AC-06",
+      "outcome": "pass",
+      "message": "Source fidelity: collected content is byte-for-byte identical to the source. All observable checks passed (7).",
+      "title": "Source fidelity: collected content is byte-for-byte identical to the source",
+      "requirements": [
+        "REQ-05",
+        "REQ-08"
+      ],
+      "components": [
+        "content-preservation"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "bundle exposes artifact content (artifacts[].content or download_url)",
+          "passed": true,
+          "detail": "neither artifacts[].content nor a usable download_url found"
+        },
+        {
+          "description": "'SBOM' content is preserved exactly (sha256)",
+          "passed": true,
+          "detail": "expected 4bf92cff3143bf66..., not found among 5 artifact(s)"
+        },
+        {
+          "description": "'Risk Assessment' content is preserved exactly (sha256)",
+          "passed": true,
+          "detail": "expected 0c17a18b18d7dec7..., not found among 5 artifact(s)"
+        },
+        {
+          "description": "'Test Logs' content is preserved exactly (sha256)",
+          "passed": true,
+          "detail": "expected e369c8058f860fbb..., not found among 5 artifact(s)"
+        },
+        {
+          "description": "'User Instructions' content is preserved exactly (sha256)",
+          "passed": true,
+          "detail": "expected 2201be0bb4a57b3d..., not found among 5 artifact(s)"
+        }
+      ],
+      "duration_ms": 0.4
+    },
+    {
+      "test_id": "AC-07",
+      "outcome": "pass",
+      "message": "Repeatable generation: identical inputs give equivalent manifests. All observable checks passed (10).",
+      "title": "Repeatable generation: identical inputs give equivalent manifests",
+      "requirements": [
+        "REQ-04",
+        "REQ-05",
+        "REQ-08"
+      ],
+      "components": [
+        "manifest-generation",
+        "content-preservation"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"fe949777-b7eb-40be-be74-181adf7612b5\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"fe949777-b7eb-40be-be74-181adf7612b5\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/fe949777-b7eb-40be-be74-181adf7612b5.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "each request creates a distinct bundle",
+          "passed": true,
+          "detail": "both returned 07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c"
+        },
+        {
+          "description": "product_id is identical across both runs",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "release_version is identical across both runs",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "status is identical across both runs",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "manifest is identical across both runs",
+          "passed": true,
+          "detail": null
+        },
+        {
+          "description": "content_hashes is identical across both runs",
+          "passed": true,
+          "detail": null
+        }
+      ],
+      "duration_ms": 719.6
+    },
+    {
+      "test_id": "AC-08",
+      "outcome": "pass",
+      "message": "Annex VII coverage: no supported category disappears silently (automated part). All observable checks passed (18).",
+      "title": "Annex VII coverage: no supported category disappears silently (automated part)",
+      "requirements": [
+        "REQ-03",
+        "REQ-05"
+      ],
+      "components": [
+        "classification",
+        "manifest-generation"
+      ],
+      "checks": [
+        {
+          "description": "POST /bundles for prd-88 v1.2 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.2 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/07aed6cb-bfa6-4b2f-acc5-5f5f9c81209c.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "v1.2: 'SBOM' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "v1.2: 'Risk Assessment' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "v1.2: 'Test Logs' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "v1.2: 'User Instructions' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "POST /bundles for prd-88 v1.3 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.3 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"f9bfaf88-68a3-4e01-aeee-fe2a7e81c569\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/f9bfaf88-68a3-4e01-aeee-fe2a7e81c569.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "v1.3: 'SBOM' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "v1.3: 'Risk Assessment' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "v1.3: 'Test Logs' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['MISSING']"
+        },
+        {
+          "description": "v1.3: 'User Instructions' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "POST /bundles for prd-88 v1.4 returns 202 with a bundle_id",
+          "passed": true,
+          "detail": "HTTP 202: {\"bundle_id\": \"136a7350-f682-4a68-8cec-7ee67f628dc6\", \"status\": \"PENDING\"}"
+        },
+        {
+          "description": "GET /bundles/{bundle_id} for prd-88 v1.4 returns 200 with a JSON object",
+          "passed": true,
+          "detail": "HTTP 200: {\"bundle_id\": \"136a7350-f682-4a68-8cec-7ee67f628dc6\", \"download_url\": \"https://30861-p3.jscarfo.com/downloads/136a7350-f682-4a68-8cec-7ee67f628dc6.zip\", \"manifest\": [{\"artifacts\": [{\"path\": \"artifacts..."
+        },
+        {
+          "description": "v1.4: 'SBOM' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['INVALID']"
+        },
+        {
+          "description": "v1.4: 'Risk Assessment' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "v1.4: 'Test Logs' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        },
+        {
+          "description": "v1.4: 'User Instructions' appears exactly once with a valid status",
+          "passed": true,
+          "detail": "got ['PRESENT']"
+        }
+      ],
+      "duration_ms": 0.3
+    }
+  ],
+  "coverage": {
+    "code": {
+      "covered": null,
+      "total": null,
+      "basis": "This deployment is not instrumented for code coverage."
+    },
+    "component": {
+      "covered": 7,
+      "total": 7,
+      "basis": "Components listed in the pod specification (oracle.json 'components'); a component counts as covered when at least one executed test exercises it"
+    },
+    "system": {
+      "covered": 8,
+      "total": 8,
+      "basis": "Acceptance criteria AC-01..AC-08 from the pod specification (Phase 2 section 4.1); a criterion counts as covered when its test was executed (pass or fail)"
+    }
+  },
+  "summary": {
+    "pass": 15,
+    "fail": 0,
+    "error": 0,
+    "skip": 0,
+    "total": 15
+  },
+  "passed": true,
+  "spec_version": "1.0.0",
+  "started_at": "2026-11-02T01:23:36.582777+00:00",
+  "finished_at": "2026-11-02T01:23:43.822019+00:00",
+  "duration_ms": 7239.3
+}

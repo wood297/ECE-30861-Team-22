@@ -31,7 +31,6 @@ def test_reference_system_passes_every_criterion(variant):
 
     assert_spec_report(report, [c.id for c in CRITERIA])
     results = {r["test_id"]: r["outcome"] for r in report["results"]}
-    assert results.pop("AC-05") == "skip"
     assert set(results.values()) == {"pass"}, results
     assert report["passed"] is True
 
@@ -44,6 +43,9 @@ def test_reference_system_passes_every_criterion(variant):
     ("alter_content", "AC-06"),
     ("drop_missing", "AC-03"),
     ("drop_missing", "AC-08"),
+    ("hide_source_failure", "AC-05"),
+    ("silent_source_failure", "AC-05"),
+    ("drop_on_source_failure", "AC-05"),
 ])
 def test_suite_detects_defect(defect, criterion_id):
     assert outcomes(defect)[criterion_id] == "fail"
@@ -81,22 +83,23 @@ def test_unreachable_target_is_a_communication_error_not_a_pass():
 def test_exhausted_time_budget_stops_calling_the_target():
     report = run_against(time_budget=0)
 
-    assert {r["outcome"] for r in report["results"]} == {"error", "skip"}
+    # No test gets to call the target: each one is a communication error
+    assert {r["outcome"] for r in report["results"]} == {"error"}
     assert all(r["source"] == "communication" for r in report["results"] if r["outcome"] == "error")
 
 
 def test_coverage_counts_executed_tests_and_reads_code_coverage_from_the_system():
     coverage = run_against()["coverage"]
 
-    # AC-05 is skipped, so its criterion and its only component are not covered
-    assert (coverage["system"]["covered"], coverage["system"]["total"]) == (7, 8)
-    assert (coverage["component"]["covered"], coverage["component"]["total"]) == (6, 7)
+    # Every criterion runs, so every criterion and component is covered
+    assert (coverage["system"]["covered"], coverage["system"]["total"]) == (8, 8)
+    assert (coverage["component"]["covered"], coverage["component"]["total"]) == (7, 7)
     assert coverage["code"] == CODE_COVERAGE
 
 
 def test_coverage_counts_failed_tests_as_covered():
     # Coverage records what was exercised, not whether the system behaved correctly
-    assert run_against("alter_content")["coverage"]["system"]["covered"] == 7
+    assert run_against("alter_content")["coverage"]["system"]["covered"] == 8
 
 
 def test_code_coverage_is_null_with_a_reason_when_the_system_has_no_report():

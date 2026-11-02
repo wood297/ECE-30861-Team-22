@@ -180,3 +180,24 @@ def test_cli_configuration_error(monkeypatch, capsys):
     assert output["status"] == "error"
     assert output["code"] == "configuration"
     assert TOKEN not in json.dumps(output)
+
+
+def test_anonymous_reads_send_no_authorization_header():
+    config = GitHubConfig(token="", repository="owner/repo", allow_anonymous=True)
+    opener = Mock()
+    opener.open.return_value.__enter__ = Mock(return_value=io.BytesIO(b'{"sha": "x"}'))
+    opener.open.return_value.__exit__ = Mock(return_value=False)
+    GitHubClient(config, opener=opener)._get("/repos/owner/repo")
+    request = opener.open.call_args.args[0]
+    assert request.get_header("Authorization") is None
+
+
+def test_anonymous_mode_is_opt_in_and_cannot_verify_access():
+    with pytest.raises(GitHubError) as missing:
+        GitHubConfig(token="", repository="owner/repo")
+    assert missing.value.code == "configuration"
+    client = GitHubClient(GitHubConfig(token="", repository="owner/repo", allow_anonymous=True), opener=Mock())
+    with pytest.raises(GitHubError) as verify:
+        client.verify_access()
+    assert verify.value.code == "configuration"
+    client._opener.open.assert_not_called()

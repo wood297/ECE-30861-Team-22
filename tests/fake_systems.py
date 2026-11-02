@@ -25,7 +25,13 @@ DEFECTS = {
     "zip_only",          # exposes content only through a zip download_url (not a defect)
     "crash_on_bad_input",  # answers 500 instead of 400 for a non-string identifier
     "no_test_endpoints",   # has no /test/setup or /test/report
+    "hide_source_failure",    # reports a failed external source as MISSING instead of INACCESSIBLE
+    "silent_source_failure",  # reports INACCESSIBLE but names no source and gives no diagnostic
+    "drop_on_source_failure",  # loses the successfully retrieved artifacts when a source fails
 }
+
+# (product, release, category) whose external source fails, as in the pod's Phase 4 fixture
+FAILING_SOURCES = {("prd-88", "v1.2-github-inaccessible", "Test Logs")}
 
 # What the reference system reports from GET /test/report
 CODE_COVERAGE = {"covered": 42, "total": 50, "basis": "Source lines of the reference system"}
@@ -78,7 +84,14 @@ def make_reference_system(*defects):
         manifest, artifacts = [], []
         for category, filename in FILES.items():
             path = folder / filename
-            if not path.is_file():
+            item = {"category": category, "external_source": "fixtures"}
+            if (product, release, category) in FAILING_SOURCES:
+                status = "MISSING" if "hide_source_failure" in defects else "INACCESSIBLE"
+                if status == "INACCESSIBLE" and "silent_source_failure" not in defects:
+                    item.update(external_source="GitHub", source_failure_detail="File not found at the pinned commit.")
+                elif status == "INACCESSIBLE":
+                    del item["external_source"]
+            elif not path.is_file():
                 status = "MISSING"
             elif not path.read_bytes().strip() and "accept_empty" not in defects:
                 status = "INVALID"
@@ -86,7 +99,7 @@ def make_reference_system(*defects):
                 status = "PRESENT"
             if status == "MISSING" and "drop_missing" in defects:
                 continue
-            manifest.append({"category": category, "status": status, "external_source": "fixtures"})
+            manifest.append({**item, "status": status})
             if status == "PRESENT":
                 content = path.read_bytes().decode("utf-8")
                 if "alter_content" in defects:
@@ -94,6 +107,8 @@ def make_reference_system(*defects):
                 artifacts.append({"category": category, "product_id": product,
                                   "release_version": release, "content": content})
 
+        if "drop_on_source_failure" in defects and any(i["status"] == "INACCESSIBLE" for i in manifest):
+            artifacts = []
         if not folder.is_dir():
             status = "FAILED"
         elif all(item["status"] == "PRESENT" for item in manifest):

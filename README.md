@@ -22,7 +22,7 @@ The Phase 4 system consists of the following components:
 | Component | Function |
 |---|---|
 | Flask API | Handles documentation requests and exposes processing results |
-| GitHub Connector | Built and tested for SBOM and User Instructions, but not connected to the service yet (planned for Phase 5) |
+| GitHub Connector | Connected through `source_catalog.json`: a category can point at one file in a GitHub repository at a pinned commit. Used today only for the pod's source-failure fixture (`prd-88 v1.2-github-inaccessible`, Test Logs). Pulling real releases from `prithika-sundar/cra-artifact-test` is planned for Phase 5 |
 | Format Validator | Validates Markdown, HTML, and CycloneDX JSON/XML |
 | Bedrock Classifier | Uses `openai.gpt-oss-20b` on AWS Bedrock to classify documents with a non-standard name or without the proper heading |
 | Bundle Generator | Creates the documentation manifest and ZIP bundle |
@@ -87,14 +87,14 @@ Live checks are separate and call the real model: `bedrock_live_check.py` and `b
 
 ## Known Limitations
 
-- The running service reads from local fixtures. Live GitHub retrieval is planned for Phase 5.
+- The running service reads from local fixtures, except categories listed in `source_catalog.json`. Today that's one GitHub entry, which exists to test source failure (AC-05). Retrieving real releases from GitHub is planned for Phase 5. GitHub reads are anonymous unless `GITHUB_TOKEN` is set (60 requests/hour per IP; results for a pinned commit are cached).
 - CycloneDX validation does not provide full schema certification.
 - Bedrock access depends on external service availability and our account's limits.
 - Deployment uses a stored, tightly scoped AWS key, because our AWS organization's policy doesn't allow GitHub's OIDC sign-in.
 
 ## GitHub connector setup
 
-The connector isn't used by the running service yet. Connecting it is planned for Phase 5.
+The running service uses the connector only for entries in `source_catalog.json`, and reads public repositories anonymously. The token setup below is for the separate access check, and for private repositories later.
 
 This increment provides a reusable read-only GitHub client and a local verification
 command. It authenticates a server-side personal access token through `GET /user`,

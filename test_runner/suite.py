@@ -394,7 +394,7 @@ def api_unknown_release(ctx, case):
 @criterion("AC-01", "Release identification: artifacts belong to the requested release",
            ["REQ-01", "REQ-04"], ["artifact-retrieval"])
 def ac01_release_identification(ctx, case):
-    for key in ("complete", "missing"):
+    for key in ("complete", "missing", "second"):
         fx = ctx.fixture(key)
         run = ctx.bundle(case, key)
         label = f"{fx['product_id']} {fx['release_version']}"
@@ -411,14 +411,17 @@ def ac01_release_identification(ctx, case):
             case.check(f"{label}: every artifact is associated with the requested release", not wrong,
                        f"{len(wrong)} artifact(s) tagged with another release" if wrong else None)
 
-    # Content from one release must not leak into the other's bundle
-    complete_hashes = {_sha256(b) for b in ctx.expected_contents("complete").values()}
-    missing_hashes = {_sha256(b) for b in ctx.expected_contents("missing").values()}
-    for key, foreign in (("complete", missing_hashes - complete_hashes),
-                         ("missing", complete_hashes - missing_hashes)):
-        fx = ctx.fixture(key)
+    # Content from one release must not leak into another release's bundle. v1.2 is compared with
+    # v1.3 (shares three files) and with v2.0 (shares none)
+    hashes = {key: {_sha256(b) for b in ctx.expected_contents(key).values()}
+              for key in ("complete", "missing", "second")}
+    for key, other in (("complete", "missing"), ("missing", "complete"),
+                       ("complete", "second"), ("second", "complete")):
+        fx, ofx = ctx.fixture(key), ctx.fixture(other)
+        foreign = hashes[other] - hashes[key]
         contents = ctx.collected_contents(ctx.bundle(case, key))
-        description = f"{fx['product_id']} {fx['release_version']}: no artifact from another release is included"
+        description = (f"{fx['product_id']} {fx['release_version']}: "
+                       f"no artifact from {ofx['release_version']} is included")
         if contents is None:
             case.check(description, None, "bundle does not expose artifact content")
             continue
@@ -466,8 +469,47 @@ def ac04_invalid_artifact(ctx, case):
 @criterion("AC-05", "External source failure is reported as INACCESSIBLE",
            ["REQ-02", "REQ-06", "REQ-07"], ["source-failure-handling"])
 def ac05_source_failure(ctx, case):
-    raise Skip("Not executed: Phase 3 uses a single controlled source, so a source failure cannot be "
-               "induced through the shared interface. Deferred to Phase 4 (Phase 2 section 6.1).")
+    """Phase 2 AC-05 and the REQ-07 note in Section 5.1, checked in that order:
+    (a) the failed category is INACCESSIBLE and the others keep their expected status,
+    (b) the bundle is PARTIAL_SUCCESS with source_failure_detail on the failed category,
+    (c) a download_url is still provided, and (d) the retrieved evidence is all still there."""
+    fx = ctx.fixture("source_failure")
+    run = ctx.bundle(case, "source_failure")
+    failed = [c for c, s in fx["categories"].items() if s == "INACCESSIBLE"]
+
+    # (a)
+    check_categories(case, run, fx["categories"])
+
+    # (b)
+    status = run.body.get("status")
+    case.check("REQ-07: a partial source failure gives PARTIAL_SUCCESS (neither COMPLETED nor FAILED)",
+               status == "PARTIAL_SUCCESS", f"got {status!r}")
+    index = _manifest_index(run.body)
+    for category in failed:
+        entries = index.get(_norm(category), [])
+        detail = entries[0].get("source_failure_detail") if len(entries) == 1 else None
+        case.check(f"REQ-07: the {category} entry explains which source or artifact failed "
+                   f"(source_failure_detail)", isinstance(detail, str) and bool(detail.strip()),
+                   f"got {detail!r}")
+        check_not_collected(case, ctx, run, category)
+
+    # (c) Section 5.1 asks for the download_url even when a source failed. A team that only
+    # returns inline content is not wrong about the evidence, so that case is n/a, not a failure.
+    url = run.body.get("download_url")
+    inline = any(isinstance(a, dict) and isinstance(a.get("content"), str)
+                 for a in run.body.get("artifacts") or [])
+    case.check("REQ-07: the partial bundle still has a download_url",
+               True if isinstance(url, str) and url else (None if inline else False),
+               "content is returned inline instead" if inline and not url else f"got {url!r}")
+
+    # (d) One check for the whole set: which retrieved files went missing or changed
+    contents = ctx.collected_contents(run)
+    case.require("the bundle still exposes the evidence that was retrieved", contents is not None,
+                 "neither artifacts[].content nor a usable download_url found")
+    present = {_sha256(data) for _, data in contents}
+    lost = [c for c, data in ctx.expected_contents("source_failure").items() if _sha256(data) not in present]
+    case.check(f"all {len(fx['categories']) - len(failed)} artifacts from the working source are kept unchanged",
+               not lost, f"lost or altered: {lost}" if lost else None)
 
 
 @criterion("AC-06", "Source fidelity: collected content is byte-for-byte identical to the source",

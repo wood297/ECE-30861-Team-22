@@ -53,7 +53,7 @@ def test_success_preserves_handoff_and_prompt_boundary():
         assert r.validation.original_bytes is original
         assert r.classification.original_bytes is original
         assert (r.retrieval.product_id, r.retrieval.release_version, r.retrieval.revision,
-                r.retrieval.external_source) == ("p", "v", "fixed-commit", "github")
+                r.retrieval.external_source) == ("p", "v", "fixed-commit", "GitHub")
     assert provider.classify.call_count == 2
     for call in provider.classify.call_args_list:
         assert set(json.loads(call.kwargs["artifact_json"])) == {"document"}

@@ -75,10 +75,10 @@ Optional extras: `"token"` on setup (sent to the target as `Authorization: Beare
   ],
   "coverage": {
     "code":      {"covered": null, "total": null, "basis": "Source lines; code coverage unavailable: ..."},
-    "component": {"covered": 6, "total": 7, "basis": "Components listed in the pod specification ..."},
-    "system":    {"covered": 7, "total": 8, "basis": "Acceptance criteria AC-01..AC-08 ..."}
+    "component": {"covered": 7, "total": 7, "basis": "Components listed in the pod specification ..."},
+    "system":    {"covered": 8, "total": 8, "basis": "Acceptance criteria AC-01..AC-08 ..."}
   },
-  "summary": {"pass": 11, "fail": 2, "error": 1, "skip": 1, "total": 15},
+  "summary": {"pass": 12, "fail": 2, "error": 1, "skip": 0, "total": 15},
   "passed": false
 }
 ```
@@ -126,12 +126,14 @@ in `fixtures/`.
 | `prd-88 v1.2` | All four categories are present (complete). |
 | `prd-88 v1.3` | Test Logs is missing. |
 | `prd-88 v1.4` | The SBOM file is empty (invalid). |
+| `prd-88 v1.2-github-inaccessible` | Test Logs comes from GitHub and that source fails (INACCESSIBLE); the other three are valid. Same bytes as Team 24's fixture. |
+| `prd-88 v2.0` | A second complete release with different content (for AC-06). Same bytes as Team 24's fixture. |
 | `prd-88 v0.0-does-not-exist` | Unknown release. |
 
 | ID | Checks |
 |---|---|
 | API-01 to API-07 | Section 5 contract: 202 with a UUID and PENDING, 400 on bad input, 404 on unknown id, response schema, terminal status reached, unknown release not reported as collected |
-| AC-01 to AC-08 | Phase 2 section 4.1. AC-05 is skipped until Phase 4 because the single controlled source cannot be made to fail through the API. AC-08 automates only the coverage check; the human inspection still applies. |
+| AC-01 to AC-08 | Phase 2 section 4.1. AC-05 uses `v1.2-github-inaccessible`: the failed category must be INACCESSIBLE with its source or a diagnostic named, the bundle PARTIAL_SUCCESS, and the other three files kept byte for byte. AC-06 checks `v1.2` and `v2.0`. AC-08 automates only the coverage check; the human inspection still applies. |
 
 Artifact content (AC-06) is read from `artifacts[].content` or from `download_url`, which can be a zip
 or JSON. Category names are compared ignoring case and whitespace.
@@ -246,12 +248,15 @@ When a defect is fixed, its test shows as XPASS. Remove its entry from `KNOWN_GA
 
 - **Code coverage** is reported as `null`. Measuring coverage for each session separately needs
   instrumentation we haven't built. The spec allows `null` as long as `basis` explains why.
-- **AC-05 (external source failure)** is skipped. Phase 3 uses one controlled source, so a source
-  failure can't be triggered through the API. This is planned for Phase 4 (Phase 2 §6.1).
+- **Successful GitHub retrieval** isn't checked by either team's suite yet. Only the failure case
+  (`v1.2-github-inaccessible`) is. Our system reads that release's Test Logs from
+  `prithika-sundar/cra-artifact-test` at a pinned commit where the file doesn't exist, as set in
+  `source_catalog.json`. In pytest, `tests/conftest.py` replaces the GitHub client with an offline
+  fake, so tests never touch the network.
 - **AC-08** automates only the category-coverage check. The Annex VII review of the manifest still
   has to be done by a person.
-- **Only Markdown** artifacts from local fixtures are tested. HTML, SBOM formats and live sources
-  (GitHub, Jenkins) come in Phase 4.
+- **Only Markdown** artifacts are tested. HTML and SBOM formats (Team 24's `phase4` profile) wait
+  until Team 24 publishes those fixtures.
 
 ### Decisions the pod still has to confirm
 

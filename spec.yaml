@@ -8,9 +8,24 @@ info:
 
     - No authentication.
     - Bundles, their zip archives and test sessions are kept in memory and cleared on restart.
-    - Phase 3 reads every release from one controlled source, the repository's
-      `fixtures/<product_id>/<release_version>/` folder (`prd-88` `v1.2`, `v1.3`, `v1.4`).
+    - Releases are read from the repository's `fixtures/<product_id>/<release_version>/` folder
+      (`prd-88` `v1.2`, `v1.3`, `v1.4`, `v2.0`, `v1.2-github-inaccessible`). `source_catalog.json`
+      can point a category at one file in a GitHub repository at a pinned commit instead. Today
+      only `prd-88 v1.2-github-inaccessible` Test Logs does, and that file is not at the pinned
+      commit, so it is reported INACCESSIBLE (the pod's Phase 4 source-failure fixture).
+    - `POST /bundles` answers `202 PENDING` straight away and the bundle is processed in the
+      background, so poll `GET /bundles/{bundle_id}` until the status is `COMPLETED`,
+      `PARTIAL_SUCCESS` or `FAILED`.
+    - Files whose name or first heading doesn't settle their category may be classified by
+      Amazon Bedrock. Code still decides every status. The shared pod fixtures all have proper
+      headings, so cross-team runs never depend on Bedrock.
     - The tester service is a separate API at `https://team22.13-58-35-224.sslip.io/tester`.
+
+    Changes in 1.3.0 (Phase 4): background processing, `GET /version`, the GitHub source and
+    the `v2.0` and `v1.2-github-inaccessible` releases, the `source_file`, `classified_by` and
+    `classification_evidence` fields, and HTML and CycloneDX SBOM files. The pod's shared
+    operations (`POST /bundles`, `GET /bundles/{bundle_id}`) and their required fields are
+    unchanged from 1.2.0.
 
     Known deviations, also noted on the affected responses:
     - A malformed JSON body (400) or a non-JSON `Content-Type` (415) on `POST /bundles` gets
@@ -18,7 +33,7 @@ info:
     - A JSON body that is not an object (for example `[1]` or `"x"`) on `POST /bundles`
       gets an HTML 500.
     - A `bundle_id` that is not a UUID gets the same 404 as an unknown UUID.
-  version: 1.2.0
+  version: 1.3.0
 servers:
   - url: https://team22.13-58-35-224.sslip.io/system
     description: Deployed system (AWS EC2)
@@ -57,6 +72,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /version:
+    get:
+      tags: [Service]
+      summary: Deployed version
+      operationId: getVersion
+      description: The branch and commit this server runs, written at deploy time. `unknown` on a local run.
+      responses:
+        '200':
+          description: The deployed version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
 
   /bundles:
     post:
@@ -332,12 +361,13 @@ components:
           enum: [PRESENT, MISSING, INVALID, INACCESSIBLE]
           description: |
             PRESENT: a valid document that the rules or the classifier accepted for this category.
-            MISSING: no file. INVALID: the file has an unsupported format, fails format validation,
-            belongs to another category, or could not be confirmed. INACCESSIBLE: the file exists
-            but could not be read.
+            MISSING: no file, and no external source is configured for the category. INVALID: the
+            file has an unsupported format, fails format validation, belongs to another category, or
+            could not be confirmed. INACCESSIBLE: the file exists but could not be read, or the
+            configured external source failed or does not have the file at the pinned commit.
         external_source:
           type: string
-          description: The source queried for this artifact. Always `fixtures` in Phase 4.
+          description: The source queried for this artifact. `fixtures` for the local fixtures folder, `GitHub` for a file configured in `source_catalog.json`.
           example: "fixtures"
         source_failure_detail:
           type: string
@@ -458,8 +488,10 @@ components:
         session_id: "run-123"
         fixtures:
           - {product_id: "prd-88", release_version: "v1.2"}
+          - {product_id: "prd-88", release_version: "v1.2-github-inaccessible"}
           - {product_id: "prd-88", release_version: "v1.3"}
           - {product_id: "prd-88", release_version: "v1.4"}
+          - {product_id: "prd-88", release_version: "v2.0"}
 
     CoverageMeasure:
       type: object
@@ -521,6 +553,14 @@ components:
           type: array
           items:
             type: string
+
+    VersionResponse:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: string
+          example: "main@430a16b"
 
     HealthResponse:
       type: object

@@ -3,7 +3,12 @@ from unittest.mock import Mock
 import pytest
 
 from artifact_formats import validate_artifact
-from github_artifact_retrieval import ConfirmedArtifactMissing, GitHubArtifactRetriever
+from github_artifact_retrieval import (
+    NOT_FOUND_DETAIL,
+    ConfirmedArtifactMissing,
+    GitHubArtifactRetriever,
+    fetch_configured_artifact,
+)
 from github_client import GitHubError
 
 
@@ -138,3 +143,63 @@ def test_custom_candidates_cannot_escape_directory_or_add_categories():
     for category, filename in [("SBOM", "../sbom.json"), ("Product Description", "description.md")]:
         with pytest.raises(ValueError):
             GitHubArtifactRetriever(Mock(), revision="r", candidates=((category, ((filename, "markdown"),)),))
+
+
+# --- fetch_configured_artifact: one catalog-configured file at a pinned commit (Team 24 behavior) ---
+
+PINNED = "0123456789abcdef0123456789abcdef01234567"
+
+
+def fetch(client, **overrides):
+    args = dict(category="Test Logs", product_id="prd-88", release_version="v1.2-github-inaccessible",
+                path="fixtures/prd-88/v1.2/test_logs.md", revision=PINNED)
+    args.update(overrides)
+    return fetch_configured_artifact(client, **args)
+
+
+def test_configured_file_is_retrieved_byte_for_byte():
+    data = b"# Test Logs\r\nPASS\r\n"
+    client = client_with({("fixtures/prd-88/v1.2/test_logs.md", PINNED): data})
+    result = fetch(client)
+    assert result.outcome == "RETRIEVED"
+    assert result.original_bytes is data
+    assert (result.category, result.product_id, result.release_version, result.revision) == (
+        "Test Logs", "prd-88", "v1.2-github-inaccessible", PINNED)
+    assert result.external_source == "GitHub"
+    assert client.get_file.call_args.kwargs == {"ref": PINNED}
+
+
+def test_configured_file_absent_at_pinned_commit_is_inaccessible_not_missing():
+    # Team 24's v1.2-github-inaccessible fixture: the catalog promises a file that is not there
+    result = fetch(client_with({}))
+    assert result.outcome == "INACCESSIBLE"
+    assert result.error_code == "not_found"
+    assert result.source_failure_detail == NOT_FOUND_DETAIL
+    assert result.original_bytes is None
+
+
+@pytest.mark.parametrize("code", ["authentication", "permission", "rate_limited", "timeout", "connection",
+                                  "repository_access", "secret-token"])
+def test_configured_source_failures_are_inaccessible_and_sanitized(code):
+    client = client_with({("fixtures/prd-88/v1.2/test_logs.md", PINNED): GitHubError(code, "token body")})
+    result = fetch(client)
+    assert result.outcome == "INACCESSIBLE"
+    assert result.error_code == (code if code != "secret-token" else "source_failure")
+    assert "token body" not in repr(result) and "secret-token" not in repr(result)
+
+
+@pytest.mark.parametrize("overrides", [
+    {"revision": "main"}, {"revision": PINNED.upper()}, {"revision": PINNED[:-1]},
+    {"category": "Product Description"}, {"declared_format": "pdf"},
+    {"path": "../secrets"}, {"path": ""}, {"path": "a//b"}, {"release_version": "../v1"},
+])
+def test_configured_fetch_rejects_bad_configuration_before_calling_github(overrides):
+    client = Mock()
+    with pytest.raises(ValueError):
+        fetch(client, **overrides)
+    client.get_file.assert_not_called()
+
+
+def test_configured_fetch_allows_every_pod_category():
+    for category in ("SBOM", "Risk Assessment", "Test Logs", "User Instructions"):
+        assert fetch(client_with({}), category=category).category == category

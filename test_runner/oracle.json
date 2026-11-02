@@ -16,7 +16,16 @@
     "content-preservation": "Returns collected artifact content unchanged (REQ-08)",
     "source-failure-handling": "Reports a failed external source while keeping other results (REQ-07)"
   },
-  "acceptance_criteria": ["AC-01", "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-08"],
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08"
+  ],
   "releases": {
     "complete": {
       "product_id": "prd-88",
@@ -47,6 +56,30 @@
       "purpose": "The SBOM artifact exists but is empty.",
       "categories": {
         "SBOM": "INVALID",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "PRESENT",
+        "User Instructions": "PRESENT"
+      }
+    },
+    "source_failure": {
+      "product_id": "prd-88",
+      "release_version": "v1.2-github-inaccessible",
+      "purpose": "Test Logs comes from an external source (GitHub) that fails; the other three are valid local Markdown. Pod fixture agreed with Team 24 for Phase 4.",
+      "expected_bundle_status": "PARTIAL_SUCCESS",
+      "categories": {
+        "SBOM": "PRESENT",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "INACCESSIBLE",
+        "User Instructions": "PRESENT"
+      }
+    },
+    "second": {
+      "product_id": "prd-88",
+      "release_version": "v2.0",
+      "purpose": "A second complete release with different content, so fidelity is checked on more than one release. Pod fixture agreed with Team 24 for Phase 4.",
+      "expected_bundle_status": "COMPLETED",
+      "categories": {
+        "SBOM": "PRESENT",
         "Risk Assessment": "PRESENT",
         "Test Logs": "PRESENT",
         "User Instructions": "PRESENT"

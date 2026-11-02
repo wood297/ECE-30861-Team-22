@@ -9,6 +9,7 @@ import pytest
 
 import artifact_pipeline
 from artifact_pipeline import EXPECTED_FILES, retrieve_and_classify
+from github_client import GitHubError
 
 ALL_FILES = {filename: f"# {category}\n" for category, filename in EXPECTED_FILES.items()}
 
@@ -189,3 +190,81 @@ def test_path_traversal_is_rejected(fixtures_root, product, release):
 
     assert bundle["status"] == "FAILED"
     assert bundle["artifacts"] == []
+
+
+# --- Catalog sources: a category configured to come from GitHub at a pinned commit ---
+
+
+
+class FakeGitHub:
+    def __init__(self, result):
+        self.result = result
+        self.calls = 0
+
+    def get_file(self, path, ref):
+        self.calls += 1
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+def run_github_release(monkeypatch, fake):
+    monkeypatch.setattr(artifact_pipeline, "make_github_client", lambda repository: fake)
+    artifact_pipeline.clear_github_cache()
+    bundle = {"product_id": "prd-88", "release_version": "v1.2-github-inaccessible"}
+    artifact_pipeline.retrieve_and_classify(bundle)
+    return bundle, {item["category"]: item for item in bundle["manifest"]}
+
+
+def test_github_file_absent_at_pinned_commit_is_inaccessible_and_others_are_kept():
+    # Uses the offline client from conftest, like the real pinned commit
+    bundle = {"product_id": "prd-88", "release_version": "v1.2-github-inaccessible"}
+    retrieve_and_classify(bundle)
+    items = {item["category"]: item for item in bundle["manifest"]}
+
+    assert items["Test Logs"]["status"] == "INACCESSIBLE"
+    assert items["Test Logs"]["external_source"] == "GitHub"
+    assert "not found at the pinned commit" in items["Test Logs"]["source_failure_detail"]
+    assert [items[c]["status"] for c in ("SBOM", "Risk Assessment", "User Instructions")] == ["PRESENT"] * 3
+    assert {a["category"] for a in bundle["artifacts"]} == {"SBOM", "Risk Assessment", "User Instructions"}
+
+
+def test_github_file_found_is_present_byte_for_byte(monkeypatch):
+    data = "# Test Logs\r\nPASS\r\n".encode()
+    bundle, items = run_github_release(monkeypatch, FakeGitHub(data))
+
+    assert (items["Test Logs"]["status"], items["Test Logs"]["external_source"]) == ("PRESENT", "GitHub")
+    logs = next(a for a in bundle["artifacts"] if a["category"] == "Test Logs")
+    assert logs["content"].encode() == data
+
+
+def test_empty_github_file_is_invalid(monkeypatch):
+    _, items = run_github_release(monkeypatch, FakeGitHub(b"  \n"))
+    assert items["Test Logs"]["status"] == "INVALID"
+
+
+def test_github_outage_is_inaccessible_and_not_cached(monkeypatch):
+    fake = FakeGitHub(GitHubError("timeout", "secret upstream text"))
+    _, items = run_github_release(monkeypatch, fake)
+    assert items["Test Logs"]["status"] == "INACCESSIBLE"
+    assert "secret" not in items["Test Logs"]["source_failure_detail"]
+
+    # A temporary failure is retried on the next request
+    artifact_pipeline.retrieve_and_classify({"product_id": "prd-88", "release_version": "v1.2-github-inaccessible"})
+    assert fake.calls == 2
+
+
+def test_pinned_commit_results_are_cached(monkeypatch):
+    fake = FakeGitHub(b"# Test Logs\n")
+    run_github_release(monkeypatch, fake)
+    artifact_pipeline.retrieve_and_classify({"product_id": "prd-88", "release_version": "v1.2-github-inaccessible"})
+    assert fake.calls == 1
+
+
+def test_releases_without_catalog_entries_never_call_github(monkeypatch):
+    def fail(repository):
+        raise AssertionError("GitHub should not be used")
+    monkeypatch.setattr(artifact_pipeline, "make_github_client", fail)
+    bundle = {"product_id": "prd-88", "release_version": "v1.2"}
+    retrieve_and_classify(bundle)
+    assert {item["external_source"] for item in bundle["manifest"]} == {"fixtures"}
