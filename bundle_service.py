@@ -1,8 +1,11 @@
 import io
 import json
+import logging
 import zipfile
 
-from artifact_pipeline import EXPECTED_FILES, retrieve_and_classify
+from artifact_pipeline import retrieve_and_classify
+
+logger = logging.getLogger(__name__)
 
 # bundle_id -> zip archive (bytes) of the generated bundle, served by GET /bundles/<id>/download.
 # Kept in memory for Phase 3, so a restart clears it along with the bundles.
@@ -28,7 +31,7 @@ def build_archive(bundle):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for artifact in bundle["artifacts"]:
-            _add(archive, EXPECTED_FILES[artifact["category"]], artifact["content"].encode("utf-8"))
+            _add(archive, artifact["source_file"], artifact["content"].encode("utf-8"))
         manifest = {key: bundle[key] for key in ("product_id", "release_version", "status", "manifest")}
         _add(archive, "manifest.json", json.dumps(manifest, indent=2).encode("utf-8") + b"\n")
     return buffer.getvalue()
@@ -48,13 +51,28 @@ def process_bundle(bundle):
     Person 3: generate the final bundle and manifest.
     """
 
+    # This can run in the background while GET reads the same bundle, so the terminal status
+    # is set last: a client that sees it can rely on the manifest and archive being ready.
+    bundle["status"] = "PROCESSING"
+
     # Person 2: fills in bundle["artifacts"] and bundle["manifest"]
     retrieve_and_classify(bundle)
     if bundle["status"] == "FAILED":
         return bundle
 
     # Person 3: terminal status, then the downloadable archive
-    bundle["status"] = final_status(bundle["manifest"])
-    archives[bundle["bundle_id"]] = build_archive(bundle)
+    status = final_status(bundle["manifest"])
+    archives[bundle["bundle_id"]] = build_archive({**bundle, "status": status})
+    bundle["status"] = status
 
     return bundle
+
+
+def process_bundle_safely(bundle):
+    """Runs process_bundle, making sure a bundle can't stay stuck if something unexpected breaks."""
+    try:
+        process_bundle(bundle)
+    except Exception:
+        logger.exception("Processing failed for bundle %s", bundle["bundle_id"])
+        bundle["error"] = "Processing failed unexpectedly"
+        bundle["status"] = "FAILED"

@@ -58,6 +58,7 @@ class ClassificationResult:
     decision: str
     actual_category: str | None = None
     error_code: str | None = None
+    evidence: str | None = None
 
     @property
     def original_bytes(self) -> bytes:
@@ -114,9 +115,10 @@ def classify_artifact(artifact: ValidationResult, expected_category: str,
             raise ValueError("Inconsistent ambiguity")
         if not isinstance(evidence, str) or not evidence.strip() or len(evidence) > 1000:
             raise ValueError("Invalid evidence")
-        if evidence not in artifact.text:
+        # Models often quote across lines with spaces, so only the words have to match
+        if " ".join(evidence.split()) not in " ".join(artifact.text.split()):
             raise ValueError("Ungrounded evidence")
     except (ValueError, RecursionError):
         return failure("malformed_response")
     decision = "AMBIGUOUS" if ambiguous else ("MATCH" if actual == expected_category else "INVALID")
-    return ClassificationResult(artifact, expected_category, decision, actual)
+    return ClassificationResult(artifact, expected_category, decision, actual, evidence=evidence)

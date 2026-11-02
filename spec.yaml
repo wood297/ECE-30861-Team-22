@@ -152,8 +152,8 @@ paths:
       operationId: downloadBundle
       description: |
         The zip archive that `download_url` points to: each collected artifact under its
-        source file name (`sbom.md`, `risk_assessment.md`, `test_logs.md`,
-        `user_instructions.md`), byte for byte as retrieved, plus `manifest.json` with
+        source file name (such as `sbom.md`, `sbom.json` or `risk_assessment.md`), byte for
+        byte as retrieved, plus `manifest.json` with
         `product_id`, `release_version`, `status` and `manifest`. The archive omits
         `bundle_id` and uses a fixed timestamp, so identical requests give identical archives.
       parameters:
@@ -331,16 +331,29 @@ components:
           type: string
           enum: [PRESENT, MISSING, INVALID, INACCESSIBLE]
           description: |
-            PRESENT: the file exists and is non-blank UTF-8 text. MISSING: no file.
-            INVALID: the file is empty or not UTF-8. INACCESSIBLE: the file exists but could not be read.
+            PRESENT: a valid document that the rules or the classifier accepted for this category.
+            MISSING: no file. INVALID: the file has an unsupported format, fails format validation,
+            belongs to another category, or could not be confirmed. INACCESSIBLE: the file exists
+            but could not be read.
         external_source:
           type: string
-          description: The source queried for this artifact. Always `fixtures` in Phase 3.
+          description: The source queried for this artifact. Always `fixtures` in Phase 4.
           example: "fixtures"
         source_failure_detail:
           type: string
           description: Present only for INVALID and INACCESSIBLE.
           example: "sbom.md is empty"
+        source_file:
+          type: string
+          description: The name of the file this status is about, when there is one.
+          example: "sbom.md"
+        classified_by:
+          type: string
+          enum: [rules, bedrock]
+          description: Whether file rules or the Bedrock classifier settled this category.
+        classification_evidence:
+          type: string
+          description: A quote from the document supporting Bedrock's answer. Only on Bedrock results.
 
     Artifact:
       type: object
@@ -354,6 +367,10 @@ components:
           type: string
         release_version:
           type: string
+        source_file:
+          type: string
+          description: The name the file has in the source and in the archive.
+          example: "sbom.md"
         content:
           type: string
           description: The file's text exactly as retrieved, line endings included.

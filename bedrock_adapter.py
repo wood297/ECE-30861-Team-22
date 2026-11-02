@@ -6,6 +6,7 @@ has quota for. Configure BEDROCK_MODEL_ID (for example openai.gpt-oss-20b) and A
 """
 
 import json
+import logging
 import os
 
 import boto3
@@ -13,6 +14,9 @@ from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.exceptions import BotoCoreError, ConnectTimeoutError, HTTPClientError, ReadTimeoutError
 from botocore.httpsession import URLLib3Session
+
+
+logger = logging.getLogger(__name__)
 
 
 class BedrockProviderError(RuntimeError):
@@ -56,9 +60,12 @@ class BedrockProvider:
             response = self._post(body)
         except (ConnectTimeoutError, ReadTimeoutError):
             raise TimeoutError("Bedrock request timed out") from None
-        except (BotoCoreError, HTTPClientError):
+        except (BotoCoreError, HTTPClientError) as error:
+            # Only the type: the message could hold upstream details
+            logger.warning("Bedrock request failed: %s", type(error).__name__)
             raise BedrockProviderError("Bedrock request failed") from None
         if response.status_code != 200:
+            logger.warning("Bedrock returned status %d", response.status_code)
             raise BedrockProviderError("Bedrock request failed")
 
         # Fail closed on truncation or anything else unexpected. Returning invalid JSON lets

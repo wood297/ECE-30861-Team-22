@@ -290,6 +290,26 @@ Restarting the app isn't needed: files are read on every request. Asking for
 `{"product_id": "my-product", "release_version": "v2.0"}` will now show SBOM and Risk Assessment
 `PRESENT`, and Test Logs and User Instructions `MISSING`.
 
+### 4.4 How documents are matched to categories
+
+Standard names are `sbom.json`, `sbom.xml`, `sbom.md` and `sbom.html`, plus `.md` or `.html` for
+`risk_assessment`, `test_logs` and `user_instructions`. Names are case-sensitive.
+
+- **A standard name with the category in its first heading** is accepted with no model call. A valid
+  CycloneDX SBOM needs no heading.
+- **A standard name without that heading** goes to Bedrock. If Bedrock names another category or
+  can't decide, the status is `INVALID`.
+- **Any other name in a supported format** goes to Bedrock only if a category is still `MISSING`, and
+  fills that category. Two files claiming one category give `INVALID`, naming both.
+- **Unsupported formats** never reach Bedrock. `sbom.pdf` is `INVALID`, and `notes.docx` is ignored.
+
+Bedrock only proposes a category, and code decides the status. Set `CRA_BEDROCK_ENABLED=1`,
+`BEDROCK_MODEL_ID=openai.gpt-oss-20b` and `AWS_REGION` to turn it on. With it off or failing, anything
+that needs it stays out of the bundle, so it can't produce a false `PRESENT`. `fixtures/bedrock-test`
+has a release for each case.
+
+`bedrock_live_check.py` and `bedrock_accuracy.py` call the real model, so they aren't part of `pytest`.
+
 ---
 
 ## 5. Running our own tests (pytest)

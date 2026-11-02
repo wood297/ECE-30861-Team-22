@@ -117,10 +117,19 @@ def validate_artifact(content: bytes, declared_format: str) -> ValidationResult:
             probe.close()
             if stripped.startswith("<") and probe.recognized:
                 raise ValueError("HTML markup does not match declared Markdown format")
-            if stripped.startswith(("{", "[", "<?xml", "<!DOCTYPE", "<!doctype")) or re.match(
+            if stripped.startswith(("<?xml", "<!DOCTYPE", "<!doctype")) or re.match(
                 r"<(?:html|head|body|bom)(?:\s|>|/)", stripped, re.IGNORECASE
             ):
                 raise ValueError("Structured document does not match declared Markdown format")
+            # A log line like "[2026-09-14 08:01:22] ..." or a link can open a Markdown file,
+            # so a bracket only means JSON when the whole document really is JSON
+            if stripped.startswith(("{", "[")):
+                try:
+                    json.loads(text)
+                except (ValueError, RecursionError):
+                    pass
+                else:
+                    raise ValueError("Structured document does not match declared Markdown format")
     except (ValueError, ElementTree.ParseError, DefusedXmlException):
         return result(False, "invalid_content", "Content does not match the declared format")
     return result(True, "valid", "Format validation passed", version)

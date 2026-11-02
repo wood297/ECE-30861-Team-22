@@ -1,12 +1,16 @@
 import copy
 import io
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify, request, send_file, url_for
-from bundle_service import archives, process_bundle
+from bundle_service import archives, process_bundle_safely
 from selftest import create_test_blueprint
 
 app = Flask(__name__)
 bundles: dict[str, dict] = {}
+# Classifying a bundle can take a while, so requests don't wait for it. Tests can set
+# PROCESS_BUNDLES_INLINE to read results straight after the POST.
+executor = ThreadPoolExecutor(max_workers=4)
 app.register_blueprint(create_test_blueprint())
 
 @app.route("/", methods=["GET"])
@@ -53,7 +57,10 @@ def create_bundle():
     # Spec 5.1: the 202 acknowledges the queued task as PENDING; results come from GET
     acknowledgement = copy.deepcopy(bundle)
 
-    process_bundle(bundle)
+    if app.config.get("PROCESS_BUNDLES_INLINE"):
+        process_bundle_safely(bundle)
+    else:
+        executor.submit(process_bundle_safely, bundle)
 
     return jsonify(acknowledgement), 202
 
