@@ -20,6 +20,17 @@ def test_health():
     assert response.get_json() == {"status": "ok"}
 
 
+def test_version_reports_the_deployed_build(monkeypatch, tmp_path):
+    client = app.test_client()
+    version_file = tmp_path / "VERSION"
+    monkeypatch.setattr("app.VERSION_FILE", version_file)
+
+    assert client.get("/version").get_json() == {"version": "unknown"}
+
+    version_file.write_text("main@abc1234\n")
+    assert client.get("/version").get_json() == {"version": "main@abc1234"}
+
+
 def test_create_bundle():
     client = app.test_client()
 

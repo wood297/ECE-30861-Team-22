@@ -558,6 +558,9 @@ Created by `deploy/aws_setup.sh`, all named or tagged `team22-cra`:
 | CloudWatch alarm | `team22-cra-auto-recover`: if AWS's hardware under the instance fails, AWS moves it to new hardware. Same IP, same disk. |
 | Budget | `team22-cra-monthly`: $15/month, emails at 80% of actual spend |
 | SSH key pair | `team22-ec2`. The private key is `~/.ssh/team22-ec2` on Person 3's laptop only. |
+| Instance role | `team22-cra-instance`: lets the server call Bedrock and be reached through SSM, with no stored keys |
+| Deploy user | `team22-cra-deploy`: created by `deploy/aws_deploy_setup.sh`. It can only upload to the bucket below and run commands on this instance. Its key is a GitHub secret. We'd prefer OIDC, which needs no stored key, but our AWS organization's policy denies it. **Rotate the key if it might have leaked, and when someone with access to it leaves.** |
+| S3 bucket | `team22-cra-deploy-685253389272`: private, holds release tarballs, deletes them after 30 days |
 
 Cost: about $11/month (the instance plus the public IPv4 address), paid from the AWS Free plan
 credits.
@@ -565,10 +568,14 @@ credits.
 ### 7.3 What is on the server
 
 ```
-/home/ubuntu/ECE-30861-Team-22/   the deployed code: a copy of one commit, NOT a git clone
-    VERSION                       which branch@commit is deployed, e.g. person3-bundle-generation@35068a5
-    .venv/                        Python virtual environment with requirements.txt installed
-/etc/systemd/system/cra.service   runs gunicorn at boot and restarts it if it crashes
+/home/ubuntu/cra/
+    current -> releases/<time>-<commit>    the live release
+    previous -> releases/<time>-<commit>   what a rollback returns to
+    releases/                              the newest 3 releases, each with its own .venv
+        <time>-<commit>/VERSION            which branch@commit this is, e.g. main@abc1234
+        <time>-<commit>/deploy/cra.env     the app's non-secret settings
+    remote_deploy.sh                       kept here so a rollback works even if a release is broken
+/etc/systemd/system/cra.service   runs gunicorn from current/ at boot and restarts it if it crashes
 /etc/caddy/Caddyfile              team22.13-58-35-224.sslip.io { reverse_proxy 127.0.0.1:8000 }
 ```
 
@@ -608,46 +615,55 @@ the options we compared (checked in October 2026):
 
 ## 8. Deploying and running the server
 
-All of this needs the SSH key `~/.ssh/team22-ec2`, and your IP has to be allowed in the security
-group (8.3). Right now that means Person 3's laptop.
-
 ### 8.1 Deploy a new version
 
-From the repository on your laptop:
+**Merging to `main` deploys automatically.** When the static and test jobs in
+`.github/workflows/ci.yml` pass, the `deploy` job:
 
-```bash
-git checkout <branch to deploy>     # deploy.sh deploys whatever is checked out, not main
-git status                          # must be clean: no changes, no untracked files
-deploy/deploy.sh 13.58.35.224
-```
-
-What `deploy.sh` does:
-
-1. Packs the current commit with `git archive HEAD` (only committed files) and writes
-   `branch@commit` into `VERSION`.
-2. Copies it to `/home/ubuntu/ECE-30861-Team-22` with `rsync --delete`. Files that aren't in the
-   commit are removed, except `.venv`.
-3. On the server, runs `deploy/server_setup.sh`. It installs Caddy the first time, and rewrites
-   `cra.service` and the `Caddyfile` every time.
-4. Installs `requirements.txt` into `.venv` and runs `pytest`.
-5. Restarts `cra`, then calls `http://127.0.0.1:8000/` to check it answers.
-
-It ends with `Deployed <branch>@<commit> to https://team22.13-58-35-224.sslip.io`.
+1. Signs in to AWS with the deploy user's key and uploads the commit to S3 as a tarball, with
+   `branch@commit` in `VERSION`.
+2. Runs `deploy/remote_deploy.sh` on the server through SSM. No SSH is involved.
+3. On the server, installs the release in its own folder, next to the live one. If that fails, the
+   live app is untouched.
+4. Points `current` at the new release and restarts. If the new version doesn't answer, it switches
+   back by itself.
+5. Runs `deploy/smoke_test.py` from GitHub with TLS verification on: right version, a `prd-88 v1.2`
+   bundle reaches `COMPLETED`, and the zip downloads. If that fails, it rolls back.
 
 Things to know:
 
-- **A restart wipes every bundle, session and report.** Don't deploy while another team is testing
-  us.
-- **If `pytest` fails on the server, the script stops before the restart.** The old version keeps
-  serving, but the new files (and `VERSION`) are already on disk. Any later restart, including the
-  automatic one after a crash or a reboot, would start the new, failing code. Fix the tests and
-  deploy again soon.
+- **A restart wipes every bundle, session and report.** Before another team tests us, commit an empty
+  `deploy/PAUSED` file to `main`, which stops automatic deploys. Delete it afterwards. Running the
+  workflow by hand on `main` (Actions tab, then "Run workflow") deploys even while paused.
+- **Tests no longer run on the server,** because CI has already tested the same commit.
 
-Then check the deployment from your laptop (9.1). To see which commit is live:
+**The deploy key** is stored in the `production` GitHub environment (Settings → Environments), as
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. That environment is limited to the `main` branch, so
+other branches and forks can't read it. To create or rotate the key, run this in your own terminal
+and never paste the output anywhere public:
 
 ```bash
-ssh -i ~/.ssh/team22-ec2 ubuntu@13.58.35.224 cat ECE-30861-Team-22/VERSION
+aws --region us-east-2 iam create-access-key --user-name team22-cra-deploy
 ```
+
+To test a key without deploying, export it and run `deploy/github_deploy.sh check`. Delete an old key
+with `aws iam delete-access-key` once the new one works. A user can hold two at a time.
+
+To see which commit is live:
+
+```bash
+curl https://team22.13-58-35-224.sslip.io/system/version
+```
+
+**Manual fallback,** if GitHub Actions is unavailable. It needs the SSH key `~/.ssh/team22-ec2`, and
+your IP has to be allowed in the security group (8.3). Right now that means Person 3's laptop.
+
+```bash
+git status                          # must be clean: no changes, no untracked files
+deploy/deploy.sh 13.58.35.224       # deploys whatever is checked out, not main
+```
+
+To roll back by hand: `deploy/github_deploy.sh rollback`, after `aws login`.
 
 ### 8.2 Logs and service commands
 

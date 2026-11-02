@@ -2,9 +2,12 @@ import copy
 import io
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from flask import Flask, jsonify, request, send_file, url_for
 from bundle_service import archives, process_bundle_safely
 from selftest import create_test_blueprint
+
+VERSION_FILE = Path(__file__).parent / "VERSION"
 
 app = Flask(__name__)
 bundles: dict[str, dict] = {}
@@ -18,6 +21,7 @@ def index():
     # The base URL is what other teams register, so make it say what lives under it
     return jsonify({"service": "Team 22 CRA documentation system", "endpoints": [
         "GET  /health",
+        "GET  /version",
         "POST /bundles",
         "GET  /bundles/<bundle_id>",
         "GET  /bundles/<bundle_id>/download",
@@ -28,6 +32,12 @@ def index():
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
+
+@app.route("/version", methods=["GET"])
+def version():
+    # Written at deploy time (deploy/build_release.sh), so a local run has no version
+    version_text = VERSION_FILE.read_text().strip() if VERSION_FILE.is_file() else "unknown"
+    return jsonify({"version": version_text}), 200
 
 @app.route("/bundles", methods=["POST"])
 def create_bundle():

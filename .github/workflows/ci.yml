@@ -49,3 +49,49 @@ jobs:
       # in-process against our system (tests/test_acceptance.py) and the checks that the
       # suite still catches planted defects (tests/test_suite_validity.py)
       - run: pytest -v
+
+  # Releases each commit that reaches main and passes both jobs above. To stop this during
+  # another team's test window, commit a deploy/PAUSED file. Running the workflow by hand on
+  # main deploys even while paused.
+  deploy:
+    needs: [static, test]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    # The AWS key is a secret of this environment, which only main can use. Forks never get it.
+    environment: production
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the pause switch
+        id: pause
+        run: |
+          if [[ -f deploy/PAUSED && "${{ github.event_name }}" == "push" ]]; then
+            echo "paused=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::deploy/PAUSED exists, so this commit wasn't deployed"
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.pause.outputs.paused != 'true'
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Deploy
+        id: deploy
+        if: steps.pause.outputs.paused != 'true'
+        run: deploy/github_deploy.sh deploy
+
+      - name: Smoke test
+        id: smoke
+        if: steps.pause.outputs.paused != 'true'
+        run: python3 deploy/smoke_test.py https://team22.13-58-35-224.sslip.io/system "${{ steps.deploy.outputs.version }}"
+
+      - name: Roll back
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: deploy/github_deploy.sh rollback
