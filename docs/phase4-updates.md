@@ -11,7 +11,7 @@ requirement for the Phase 4 report.
 | Person 3 | Bedrock on gpt-oss, classification in the pipeline, background processing, automatic deployment | `a69a84f`, `fab72cc`, `1127a43`, `f8693bd`, `430a16b` |
 | Person 4 | Cross-team testing, AC-05, shared Phase 4 fixtures, GitHub source catalog, spec 1.3.0 | branch `phase4-crossteam` |
 
-## Cora: GitHub authentication (`daafde9`)
+## Person 1: GitHub authentication (`daafde9`)
 
 - `github_client.py`: a read-only GitHub client restricted to `https://api.github.com`.
   - Signs in with a personal access token (`GITHUB_TOKEN`) and checks the repository
@@ -26,7 +26,7 @@ requirement for the Phase 4 report.
 - `.env.example` documents the variable names. `.env` files are git-ignored.
 - Tests: `tests/test_github_auth.py`, with fake HTTP responses and no network.
 
-## Prithika: retrieval, validation and classification (`b370384`, `c1b39fb`)
+## Person 1: retrieval, validation and classification (`b370384`, `c1b39fb`)
 
 - **File retrieval** (`github_client.get_file`, `github_artifact_retrieval.py`):
   - Reads a file at an explicit Git revision by walking Git trees, then the blob. This
@@ -44,11 +44,11 @@ requirement for the Phase 4 report.
   - Answers must be strict JSON, and the evidence must be a quote from the document.
   - Document text is passed as data, never as instructions, to resist prompt injection.
 - **First Bedrock adapter** (`bedrock_adapter.py`, Claude Haiku through the Converse API).
-  Ethan later replaced it (below).
+  Person 3 later replaced it (below).
 - **Supporting pieces:**
   - `phase4_artifact_processing.py` chains retrieve → validate → classify.
   - `github_live_check.py` and `GITHUB_LIVE_TEST.md` are an opt-in, read-only live check.
-- **Test repository:** `prithika-sundar/cra-artifact-test` (public) holds
+- **Test repository:** `Person 1-sundar/cra-artifact-test` (public) holds
   `artifacts/test-product/v1.0/sbom.json` and `user_instructions.md`, the release we want to pull
   from GitHub in Phase 5.
 - **README:** full system documentation (`c1b39fb`).
@@ -56,7 +56,7 @@ requirement for the Phase 4 report.
   `test_artifact_formats.py`, `test_artifact_classifier.py`, `test_phase4_artifact_processing.py`,
   `test_github_live_check.py`.
 
-## Ethan: classification, background processing, automatic deployment
+## Person 3: classification, background processing, automatic deployment
 
 ### Bedrock on gpt-oss (`a69a84f`, `430a16b`)
 
@@ -115,7 +115,7 @@ requirement for the Phase 4 report.
   environment. OIDC is blocked by our AWS organization's policy.
 - GETTING_STARTED.md and README updated for Phase 4's scope.
 
-## Anthony: cross-team testing and the GitHub source (branch `phase4-crossteam`)
+## Person 4: cross-team testing and the GitHub source (branch `phase4-crossteam`)
 
 ### Cross-team runs and matching Team 24
 
@@ -131,10 +131,10 @@ requirement for the Phase 4 report.
 
 - `source_catalog.json` points a category at one file in a GitHub repository at a pinned
   commit. Today it has one entry: `prd-88 v1.2-github-inaccessible` Test Logs →
-  `prithika-sundar/cra-artifact-test` at `f6d381d`, path
+  `Person 1-sundar/cra-artifact-test` at `f6d381d`, path
   `artifacts/prd-88/v1.2-github-inaccessible/test_logs.md`, which doesn't exist there.
-- `artifact_pipeline.decide_github()` fetches it through Prithika's client and runs it through
-  Ethan's same rules. If GitHub can't supply it, the category is INACCESSIBLE with
+- `artifact_pipeline.decide_github()` fetches it through Person 1's client and runs it through
+  Person 3's same rules. If GitHub can't supply it, the category is INACCESSIBLE with
   `external_source: GitHub` and "Configured GitHub artifact was not found at the pinned commit."
   That's the same behavior as Team 24.
 - **Rule this sets:** a configured external file that isn't at the pinned commit is
@@ -166,7 +166,7 @@ requirement for the Phase 4 report.
 
 - `spec.yaml` is now **1.3.0**:
   - Documents background processing, `GET /version`, the GitHub source, the new releases and
-    Ethan's new manifest fields.
+    Person 3's new manifest fields.
   - Updates the INACCESSIBLE and MISSING definitions.
   - The shared operations and their required fields are unchanged.
 - TESTING.md and README updated. Cross-team reports are in `docs/crossteam-2026-11-01/`.
@@ -186,7 +186,7 @@ requirement for the Phase 4 report.
 
 **Still incomplete:**
 
-- Pulling real releases from GitHub (`prithika-sundar/cra-artifact-test`) is Phase 5.
+- Pulling real releases from GitHub (`Person 1-sundar/cra-artifact-test`) is Phase 5.
 - Jenkins and Confluence are Phase 5.
 - Persistent storage: bundles are still in memory.
 - Code coverage is still `null`.
