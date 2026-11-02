@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 1530" width="960" height="1530" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 2190" width="1010" height="2190" font-family="Helvetica, Arial, sans-serif">
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M1,1 L9,5 L1,9" fill="none" stroke="#1d2530" stroke-width="1.4"/>
@@ -18,155 +18,218 @@
     .title { font-size: 15px; font-weight: bold; fill: #1d2530; }
     .ink { fill: #1d2530; }
   </style>
-  <rect width="960" height="1530" fill="#ffffff"/>
-  <text class="title" x="24" y="28">Bundle generation workflow · UML activity diagram · as delivered (Phase 3)</text>
-
+  <rect width="1010" height="2190" fill="#ffffff"/>
+  <text class="title" x="24" y="28">Bundle generation workflow · UML activity diagram · as delivered (Phase 4)</text>
   <g transform="translate(0,40)">
-    <!-- legend -->
-    <g transform="translate(700,6)">
-      <rect x="0" y="0" width="236" height="122" fill="none" stroke="#c9d1db"/>
-      <circle class="ink" cx="16" cy="16" r="6"/><text class="s" x="32" y="20">initial node</text>
-      <circle cx="16" cy="34" r="7" fill="none" stroke="#1d2530" stroke-width="1.4"/><circle class="ink" cx="16" cy="34" r="4"/><text class="s" x="32" y="38">activity final</text>
-      <polygon class="dec" points="16,45 24,53 16,61 8,53"/><text class="s" x="32" y="57">decision / merge</text>
-      <rect class="act" x="6" y="66" width="20" height="13" rx="5"/><text class="s" x="32" y="76">action</text>
-      <text class="g" x="6" y="95">[guard]</text><text class="s" x="52" y="95">condition on a flow</text>
-      <rect class="region" x="6" y="104" width="20" height="12" rx="4"/><text class="s" x="32" y="114">«iterative» expansion region</text>
-    </g>
-
-    <!-- start -->
-    <circle class="ink" cx="400" cy="24" r="9"/>
-    <line class="e" x1="400" y1="33" x2="400" y2="58" marker-end="url(#arr)"/>
-
-    <rect class="act" x="200" y="60" width="400" height="56" rx="14"/>
-    <text class="t" x="400" y="83" text-anchor="middle">Receive request with product_id and release_version</text>
-    <text class="m" x="400" y="102" text-anchor="middle">POST /bundles · app.py create_bundle</text>
-    <line class="e" x1="400" y1="116" x2="400" y2="148" marker-end="url(#arr)"/>
-
-    <!-- D1: request validation -->
-    <polygon class="dec" points="400,150 424,174 400,198 376,174"/>
-    <line class="e" x1="424" y1="174" x2="658" y2="174" marker-end="url(#arr)"/>
-    <text class="g" x="541" y="152" text-anchor="middle">[a field is missing, blank,</text>
-    <text class="g" x="541" y="166" text-anchor="middle">not a string, or body not JSON]</text>
-    <rect class="act" x="660" y="146" width="260" height="56" rx="14"/>
-    <text class="t" x="790" y="169" text-anchor="middle">Return 400 {error}</text>
-    <text class="s" x="790" y="188" text-anchor="middle">no bundle is created</text>
-    <line class="e" x1="790" y1="202" x2="790" y2="236" marker-end="url(#arr)"/>
-    <circle cx="790" cy="250" r="12" fill="none" stroke="#1d2530" stroke-width="1.4"/>
-    <circle class="ink" cx="790" cy="250" r="7"/>
-
-    <line class="e" x1="400" y1="198" x2="400" y2="238" marker-end="url(#arr)"/>
-    <text class="g" x="408" y="222">[valid]</text>
-
-    <rect class="act" x="200" y="240" width="400" height="56" rx="14"/>
-    <text class="t" x="400" y="263" text-anchor="middle">Create bundle: new UUID, status PENDING</text>
-    <text class="m" x="400" y="282" text-anchor="middle">app.py · bundle kept in memory</text>
-    <line class="e" x1="400" y1="296" x2="400" y2="330" marker-end="url(#arr)"/>
-
-    <rect class="act" x="200" y="332" width="400" height="56" rx="14"/>
-    <text class="t" x="400" y="355" text-anchor="middle">Locate fixtures/&lt;product_id&gt;/&lt;release_version&gt;/</text>
-    <text class="m" x="400" y="374" text-anchor="middle">artifact_pipeline.py · retrieve_and_classify</text>
-    <line class="e" x1="400" y1="388" x2="400" y2="418" marker-end="url(#arr)"/>
-
-    <!-- D2: release lookup -->
-    <polygon class="dec" points="400,420 424,444 400,468 376,444"/>
-    <line class="e" x1="424" y1="444" x2="658" y2="444" marker-end="url(#arr)"/>
-    <text class="g" x="541" y="422" text-anchor="middle">[identifier contains "/" or "..",</text>
-    <text class="g" x="541" y="436" text-anchor="middle">or the folder does not exist]</text>
-    <rect class="act" x="660" y="416" width="260" height="56" rx="14"/>
-    <text class="t" x="790" y="439" text-anchor="middle">Set status FAILED and error</text>
-    <text class="s" x="790" y="458" text-anchor="middle">no manifest, artifacts or archive</text>
-
-    <line class="e" x1="400" y1="468" x2="400" y2="532" marker-end="url(#arr)"/>
-    <text class="g" x="408" y="490">[folder found]</text>
-
-    <!-- expansion region: once per category -->
-    <rect class="region" x="100" y="500" width="650" height="490" rx="16"/>
-    <text class="lab" x="116" y="520">«iterative» for each category</text>
-    <text class="s" x="412" y="520">SBOM · Risk Assessment · Test Logs · User Instructions</text>
-
-    <rect class="act" x="200" y="534" width="400" height="56" rx="14"/>
-    <text class="t" x="400" y="557" text-anchor="middle">Look for the category's expected file (e.g. sbom.md)</text>
-    <text class="m" x="400" y="576" text-anchor="middle">artifact_pipeline.py · classify_file</text>
-    <line class="e" x1="400" y1="590" x2="400" y2="610" marker-end="url(#arr)"/>
-
-    <polygon class="dec" points="400,612 424,636 400,660 376,636"/>
-    <polyline class="e" points="400,660 400,672 190,672 190,710" marker-end="url(#arr)"/>
-    <polyline class="e" points="400,672 330,672 330,710" marker-end="url(#arr)"/>
-    <polyline class="e" points="400,672 470,672 470,710" marker-end="url(#arr)"/>
-    <polyline class="e" points="470,672 610,672 610,710" marker-end="url(#arr)"/>
-    <text class="g" x="195" y="696">[no file]</text>
-    <text class="g" x="335" y="696">[unreadable]</text>
-    <text class="g" x="475" y="696">[blank / not UTF-8]</text>
-    <text class="g" x="615" y="696">[readable text]</text>
-
-    <rect class="act" x="124" y="712" width="132" height="40" rx="12"/>
-    <text class="tb" x="190" y="737" text-anchor="middle">Mark MISSING</text>
-    <rect class="act" x="264" y="712" width="132" height="40" rx="12"/>
-    <text class="tb" x="330" y="729" text-anchor="middle">Mark INACCESSIBLE</text>
-    <text class="s" x="330" y="744" text-anchor="middle">+ failure detail</text>
-    <rect class="act" x="404" y="712" width="132" height="40" rx="12"/>
-    <text class="tb" x="470" y="729" text-anchor="middle">Mark INVALID</text>
-    <text class="s" x="470" y="744" text-anchor="middle">+ failure detail</text>
-    <rect class="act" x="544" y="712" width="132" height="40" rx="12"/>
-    <text class="tb" x="610" y="737" text-anchor="middle">Mark PRESENT</text>
-
-    <line class="e" x1="610" y1="752" x2="610" y2="770" marker-end="url(#arr)"/>
-    <rect class="act" x="544" y="772" width="132" height="56" rx="12"/>
-    <text class="tb" x="610" y="789" text-anchor="middle">Add artifact</text>
-    <text class="s" x="610" y="804" text-anchor="middle">content unchanged,</text>
-    <text class="s" x="610" y="818" text-anchor="middle">tagged with release</text>
-
-    <!-- merge of the four outcomes -->
-    <line class="e" x1="190" y1="752" x2="190" y2="848"/>
-    <line class="e" x1="330" y1="752" x2="330" y2="848"/>
-    <line class="e" x1="470" y1="752" x2="470" y2="848"/>
-    <line class="e" x1="610" y1="828" x2="610" y2="848"/>
-    <line class="e" x1="190" y1="848" x2="610" y2="848"/>
-    <line class="e" x1="400" y1="848" x2="400" y2="856" marker-end="url(#arr)"/>
-    <polygon class="dec" points="400,858 418,876 400,894 382,876"/>
-    <line class="e" x1="400" y1="894" x2="400" y2="910" marker-end="url(#arr)"/>
-
-    <rect class="act" x="200" y="912" width="400" height="56" rx="14"/>
-    <text class="t" x="400" y="935" text-anchor="middle">Append manifest item</text>
-    <text class="m" x="400" y="954" text-anchor="middle">category · status · external_source="fixtures" · detail?</text>
-
-    <line class="e" x1="400" y1="968" x2="400" y2="1016" marker-end="url(#arr)"/>
-    <text class="s" x="408" y="1006">after all 4 categories</text>
-
-    <!-- D4: final status -->
-    <polygon class="dec" points="400,1018 424,1042 400,1066 376,1042"/>
-    <polyline class="e" points="376,1042 240,1042 240,1088" marker-end="url(#arr)"/>
-    <polyline class="e" points="424,1042 560,1042 560,1088" marker-end="url(#arr)"/>
-    <text class="g" x="308" y="1034" text-anchor="middle">[all 4 PRESENT]</text>
-    <text class="g" x="492" y="1034" text-anchor="middle">[otherwise]</text>
-
-    <rect class="act" x="125" y="1090" width="230" height="56" rx="14"/>
-    <text class="t" x="240" y="1113" text-anchor="middle">Set status COMPLETED</text>
-    <text class="m" x="240" y="1132" text-anchor="middle">bundle_service.py</text>
-    <rect class="act" x="445" y="1090" width="230" height="56" rx="14"/>
-    <text class="t" x="560" y="1113" text-anchor="middle">Set status PARTIAL_SUCCESS</text>
-    <text class="m" x="560" y="1132" text-anchor="middle">bundle_service.py</text>
-
-    <polyline class="e" points="240,1146 240,1188 380,1188" marker-end="url(#arr)"/>
-    <polyline class="e" points="560,1146 560,1188 420,1188" marker-end="url(#arr)"/>
-    <polygon class="dec" points="400,1170 418,1188 400,1206 382,1188"/>
-    <line class="e" x1="400" y1="1206" x2="400" y2="1228" marker-end="url(#arr)"/>
-
-    <rect class="act" x="200" y="1230" width="400" height="56" rx="14"/>
-    <text class="t" x="400" y="1253" text-anchor="middle">Build zip: PRESENT files + manifest.json (no bundle_id)</text>
-    <text class="m" x="400" y="1272" text-anchor="middle">bundle_service.py · build_archive</text>
-    <line class="e" x1="400" y1="1286" x2="400" y2="1310" marker-end="url(#arr)"/>
-
-    <!-- merge with the FAILED path -->
-    <polyline class="e" points="790,472 790,1330 420,1330" marker-end="url(#arr)"/>
-    <polygon class="dec" points="400,1312 418,1330 400,1348 382,1330"/>
-    <line class="e" x1="400" y1="1348" x2="400" y2="1372" marker-end="url(#arr)"/>
-
-    <rect class="act" x="200" y="1374" width="400" height="56" rx="14"/>
-    <text class="t" x="400" y="1397" text-anchor="middle">Return 202 {bundle_id, status: PENDING}</text>
-    <text class="m" x="400" y="1416" text-anchor="middle">app.py · result read with GET /bundles/{bundle_id}</text>
-    <line class="e" x1="400" y1="1430" x2="400" y2="1456" marker-end="url(#arr)"/>
-    <circle cx="400" cy="1470" r="12" fill="none" stroke="#1d2530" stroke-width="1.4"/>
-    <circle class="ink" cx="400" cy="1470" r="7"/>
-  </g>
-</svg>
+<g transform="translate(20,6)">
+  <rect x="0" y="0" width="226" height="158" fill="none" stroke="#c9d1db"/>
+  <circle class="ink" cx="16" cy="16" r="6"/><text class="s" x="32" y="20">initial node</text>
+  <circle cx="16" cy="34" r="7" fill="none" stroke="#1d2530" stroke-width="1.4"/><circle class="ink" cx="16" cy="34" r="4"/><text class="s" x="32" y="38">activity final</text>
+<g transform="translate(0,0)">
+<circle cx="16" cy="52" r="7" fill="#ffffff" stroke="#1d2530" stroke-width="1.4"/>
+<path d="M11.100000000000001,47.1 L20.9,56.9 M20.9,47.1 L11.100000000000001,56.9" stroke="#1d2530" stroke-width="1.4"/>
+</g><text class="s" x="32" y="56">flow final (ends one branch)</text>
+  <polygon class="dec" points="16,63 24,71 16,79 8,71"/><text class="s" x="32" y="75">decision / merge</text>
+  <rect class="act" x="6" y="84" width="20" height="13" rx="5"/><text class="s" x="32" y="94">action</text>
+  <rect class="ink" x="4" y="106" width="24" height="4"/><text class="s" x="32" y="112">fork: both branches run</text>
+  <text class="g" x="6" y="131">[guard]</text><text class="s" x="52" y="131">condition on a flow</text>
+  <rect class="region" x="6" y="140" width="20" height="12" rx="4"/><text class="s" x="32" y="150">«iterative» expansion region</text>
+</g>
+<circle class="ink" cx="470" cy="24" r="9"/>
+<polyline class="e" points="470,33 470,58" marker-end="url(#arr)"/>
+<rect class="act" x="270" y="60" width="400" height="52" rx="14"/>
+<text class="t" x="470.0" y="82.5" text-anchor="middle">Receive request with product_id and release_version</text>
+<text class="m" x="470.0" y="97.5" text-anchor="middle">POST /bundles · app.py create_bundle</text>
+<polyline class="e" points="470,112 470,122" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,124 496,150 470,176 444,150"/>
+<polyline class="e" points="496,150 718,150" marker-end="url(#arr)"/>
+<text class="g" x="607" y="128" text-anchor="middle">[a field is missing, blank,</text>
+<text class="g" x="607" y="141" text-anchor="middle">not a string, or body not JSON]</text>
+<rect class="act" x="720" y="126" width="230" height="50" rx="14"/>
+<text class="t" x="835.0" y="147.5" text-anchor="middle">Return 400 {error}</text>
+<text class="s" x="835.0" y="162.5" text-anchor="middle">no bundle is created</text>
+<polyline class="e" points="835,176 835,199" marker-end="url(#arr)"/>
+<circle cx="835" cy="210" r="10" fill="none" stroke="#1d2530" stroke-width="1.4"/>
+<circle class="ink" cx="835" cy="210" r="6"/>
+<text class="g" x="478" y="190" text-anchor="start">[valid]</text>
+<polyline class="e" points="470,176 470,198" marker-end="url(#arr)"/>
+<rect class="act" x="270" y="200" width="400" height="52" rx="14"/>
+<text class="t" x="470.0" y="222.5" text-anchor="middle">Create bundle: new UUID, status PENDING</text>
+<text class="m" x="470.0" y="237.5" text-anchor="middle">app.py · bundle kept in memory</text>
+<polyline class="e" points="470,252 470,272" marker-end="url(#arr)"/>
+<rect class="ink" x="300" y="274" width="540" height="6"/>
+<polyline class="e" points="830,280 830,298" marker-end="url(#arr)"/>
+<rect class="act" x="700" y="300" width="260" height="52" rx="14"/>
+<text class="t" x="830.0" y="322.5" text-anchor="middle">Return 202 {bundle_id, status: PENDING}</text>
+<text class="s" x="830.0" y="337.5" text-anchor="middle">client polls GET /bundles/{bundle_id}</text>
+<polyline class="e" points="830,352 830,371" marker-end="url(#arr)"/>
+<circle cx="830" cy="381" r="9" fill="#ffffff" stroke="#1d2530" stroke-width="1.4"/>
+<path d="M823.7,374.7 L836.3,387.3 M836.3,374.7 L823.7,387.3" stroke="#1d2530" stroke-width="1.4"/>
+<polyline class="e" points="470,280 470,298" marker-end="url(#arr)"/>
+<rect class="act" x="290" y="300" width="360" height="56" rx="14"/>
+<text class="t" x="470.0" y="324.5" text-anchor="middle">Process in the background, status PROCESSING</text>
+<text class="m" x="470.0" y="339.5" text-anchor="middle">app.py thread pool · bundle_service.py process_bundle</text>
+<polyline class="e" points="470,356 470,397" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,399 496,425 470,451 444,425"/>
+<polyline class="e" points="496,425 698,425" marker-end="url(#arr)"/>
+<text class="g" x="597" y="405" text-anchor="middle">[identifier has "/" or "..",</text>
+<text class="g" x="597" y="418" text-anchor="middle">or no folder for the release]</text>
+<rect class="act" x="700" y="400" width="250" height="50" rx="14"/>
+<text class="t" x="825.0" y="421.5" text-anchor="middle">Set status FAILED and error</text>
+<text class="s" x="825.0" y="436.5" text-anchor="middle">also on any unexpected error</text>
+<polyline class="e" points="950,425 990,425 990,2070"/>
+<polyline class="e" points="990,2070 498,2070" marker-end="url(#arr)"/>
+<text class="g" x="478" y="466" text-anchor="start">[folder found]</text>
+<polyline class="e" points="470,451 470,478" marker-end="url(#arr)"/>
+<rect class="act" x="270" y="480" width="400" height="50" rx="14"/>
+<text class="t" x="470.0" y="501.5" text-anchor="middle">List the release's files</text>
+<text class="m" x="470.0" y="516.5" text-anchor="middle">artifact_pipeline.py · list_fixture_files()</text>
+<rect class="region" x="25" y="548" width="945" height="1142" rx="12"/>
+<text class="lab" x="40" y="566">«iterative» for each category</text>
+<text class="lab" x="955" y="566" text-anchor="end">SBOM · Risk Assessment · Test Logs · User Instructions</text>
+<polyline class="e" points="470,530 470,582" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,584 496,610 470,636 444,610"/>
+<polyline class="e" points="444,610 170,610 170,638" marker-end="url(#arr)"/>
+<text class="g" x="307" y="592" text-anchor="middle">[source_catalog.json points</text>
+<text class="g" x="307" y="605" text-anchor="middle">this category at GitHub]</text>
+<rect class="act" x="50" y="640" width="240" height="50" rx="14"/>
+<text class="t" x="170.0" y="661.5" text-anchor="middle">Fetch the file at its pinned commit</text>
+<text class="m" x="170.0" y="676.5" text-anchor="middle">decide_github() · github_client.py</text>
+<polyline class="e" points="170,690 170,710" marker-end="url(#arr)"/>
+<polygon class="dec" points="170,712 196,738 170,764 144,738"/>
+<polyline class="e" points="196,738 380,738 380,970 442,970" marker-end="url(#arr)"/>
+<text class="g" x="206" y="730" text-anchor="start">[retrieved]</text>
+<text class="g" x="178" y="784" text-anchor="start">[not at the commit,</text>
+<text class="g" x="178" y="797" text-anchor="start">or GitHub failed]</text>
+<polyline class="e" points="170,764 170,808" marker-end="url(#arr)"/>
+<rect class="act" x="60" y="810" width="220" height="46" rx="14"/>
+<text class="tb" x="170.0" y="829.5" text-anchor="middle">Mark INACCESSIBLE</text>
+<text class="s" x="170.0" y="844.5" text-anchor="middle">external_source GitHub + detail</text>
+<polyline class="e" points="170,856 170,1560"/>
+<polyline class="e" points="170,1560 442,1560" marker-end="url(#arr)"/>
+<text class="g" x="478" y="650" text-anchor="start">[no catalog entry]</text>
+<polyline class="e" points="470,636 470,672" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,674 496,700 470,726 444,700"/>
+<polyline class="e" points="496,700 638,700" marker-end="url(#arr)"/>
+<text class="g" x="502" y="679" text-anchor="start">[standard-named file</text>
+<text class="g" x="502" y="692" text-anchor="start">can't be read]</text>
+<rect class="act" x="640" y="677.0" width="260" height="46" rx="14"/>
+<text class="tb" x="770.0" y="696.5" text-anchor="middle">Mark INACCESSIBLE</text>
+<text class="s" x="770.0" y="711.5" text-anchor="middle">+ detail</text>
+<polyline class="e" points="900,700 935,700"/>
+<polyline class="e" points="470,726 470,762" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,764 496,790 470,816 444,790"/>
+<polyline class="e" points="496,790 638,790" marker-end="url(#arr)"/>
+<text class="g" x="502" y="769" text-anchor="start">[two standard-named</text>
+<text class="g" x="502" y="782" text-anchor="start">files]</text>
+<rect class="act" x="640" y="767.0" width="260" height="46" rx="14"/>
+<text class="tb" x="770.0" y="786.5" text-anchor="middle">Mark INVALID</text>
+<text class="s" x="770.0" y="801.5" text-anchor="middle">detail names both files</text>
+<polyline class="e" points="900,790 935,790"/>
+<polyline class="e" points="470,816 470,852" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,854 496,880 470,906 444,880"/>
+<polyline class="e" points="496,880 638,880" marker-end="url(#arr)"/>
+<text class="g" x="502" y="859" text-anchor="start">[no standard-named</text>
+<text class="g" x="502" y="872" text-anchor="start">file]</text>
+<rect class="act" x="640" y="843.0" width="260" height="74" rx="14"/>
+<text class="tb" x="770.0" y="861.5" text-anchor="middle">Mark MISSING</text>
+<text class="s" x="770.0" y="876.5" text-anchor="middle">unless Bedrock (if on) assigns a</text>
+<text class="s" x="770.0" y="891.5" text-anchor="middle">non-standard file: one → PRESENT,</text>
+<text class="s" x="770.0" y="906.5" text-anchor="middle">two or more → INVALID</text>
+<polyline class="e" points="900,880 935,880"/>
+<text class="g" x="478" y="937" text-anchor="start">[one standard-named file]</text>
+<polyline class="e" points="470,906 470,942" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,944 496,970 470,996 444,970"/>
+<polyline class="e" points="470,996 470,1008" marker-end="url(#arr)"/>
+<rect class="act" x="270" y="1010" width="400" height="48" rx="14"/>
+<text class="t" x="470.0" y="1030.5" text-anchor="middle">Validate the format</text>
+<text class="m" x="470.0" y="1045.5" text-anchor="middle">artifact_formats.py · Markdown, HTML, CycloneDX</text>
+<polyline class="e" points="470,1058 470,1072" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,1074 496,1100 470,1126 444,1100"/>
+<polyline class="e" points="496,1100 638,1100" marker-end="url(#arr)"/>
+<text class="g" x="502" y="1079" text-anchor="start">[empty, not UTF-8,</text>
+<text class="g" x="502" y="1092" text-anchor="start">or malformed]</text>
+<rect class="act" x="640" y="1077.0" width="260" height="46" rx="14"/>
+<text class="tb" x="770.0" y="1096.5" text-anchor="middle">Mark INVALID</text>
+<text class="s" x="770.0" y="1111.5" text-anchor="middle">+ format detail</text>
+<polyline class="e" points="900,1100 935,1100"/>
+<text class="g" x="478" y="1146" text-anchor="start">[valid]</text>
+<polyline class="e" points="470,1126 470,1162" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,1164 496,1190 470,1216 444,1190"/>
+<polyline class="e" points="496,1190 638,1190" marker-end="url(#arr)"/>
+<text class="g" x="502" y="1169" text-anchor="start">[first heading names</text>
+<text class="g" x="502" y="1182" text-anchor="start">the category]</text>
+<rect class="act" x="640" y="1167.0" width="260" height="46" rx="14"/>
+<text class="tb" x="770.0" y="1186.5" text-anchor="middle">Mark PRESENT</text>
+<text class="s" x="770.0" y="1201.5" text-anchor="middle">classified_by rules</text>
+<polyline class="e" points="900,1190 935,1190"/>
+<text class="g" x="478" y="1236" text-anchor="start">[no such heading]</text>
+<polyline class="e" points="470,1216 470,1252" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,1254 496,1280 470,1306 444,1280"/>
+<polyline class="e" points="496,1280 638,1280" marker-end="url(#arr)"/>
+<text class="g" x="502" y="1259" text-anchor="start">[Bedrock switched</text>
+<text class="g" x="502" y="1272" text-anchor="start">off]</text>
+<rect class="act" x="640" y="1257.0" width="260" height="46" rx="14"/>
+<text class="tb" x="770.0" y="1276.5" text-anchor="middle">Mark INVALID</text>
+<text class="s" x="770.0" y="1291.5" text-anchor="middle">no heading, classification off</text>
+<polyline class="e" points="900,1280 935,1280"/>
+<text class="g" x="478" y="1322" text-anchor="start">[on]</text>
+<polyline class="e" points="470,1306 470,1328" marker-end="url(#arr)"/>
+<rect class="act" x="270" y="1330" width="400" height="48" rx="14"/>
+<text class="t" x="470.0" y="1350.5" text-anchor="middle">Ask Bedrock which category it is</text>
+<text class="s" x="470.0" y="1365.5" text-anchor="middle">cached by content hash, prompt and model</text>
+<polyline class="e" points="470,1378 470,1392" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,1394 496,1420 470,1446 444,1420"/>
+<polyline class="e" points="496,1420 638,1420" marker-end="url(#arr)"/>
+<text class="g" x="502" y="1398" text-anchor="start">[another category,</text>
+<text class="g" x="502" y="1411" text-anchor="start">unclear, or failed]</text>
+<rect class="act" x="640" y="1397.0" width="260" height="46" rx="14"/>
+<text class="tb" x="770.0" y="1416.5" text-anchor="middle">Mark INVALID</text>
+<text class="s" x="770.0" y="1431.5" text-anchor="middle">+ detail and evidence</text>
+<polyline class="e" points="900,1420 935,1420"/>
+<text class="g" x="478" y="1462" text-anchor="start">[names this category]</text>
+<polyline class="e" points="470,1446 470,1468" marker-end="url(#arr)"/>
+<rect class="act" x="320" y="1470" width="300" height="46" rx="14"/>
+<text class="tb" x="470.0" y="1489.5" text-anchor="middle">Mark PRESENT</text>
+<text class="s" x="470.0" y="1504.5" text-anchor="middle">classified_by bedrock + evidence</text>
+<polyline class="e" points="935,700 935,1560"/>
+<polyline class="e" points="935,1560 498,1560" marker-end="url(#arr)"/>
+<polyline class="e" points="470,1516 470,1532" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,1534 496,1560 470,1586 444,1560"/>
+<polyline class="e" points="470,1586 470,1598" marker-end="url(#arr)"/>
+<rect class="act" x="220" y="1600" width="500" height="64" rx="14"/>
+<text class="t" x="470.0" y="1621.0" text-anchor="middle">Record the manifest item</text>
+<text class="s" x="470.0" y="1636.0" text-anchor="middle">category · status · external_source · source_file · classified_by · evidence · detail</text>
+<text class="s" x="470.0" y="1651.0" text-anchor="middle">a PRESENT category also adds its artifact, content unchanged</text>
+<polyline class="e" points="470,1664 470,1722" marker-end="url(#arr)"/>
+<text class="lab" x="478" y="1712">after all 4 categories</text>
+<polygon class="dec" points="470,1724 496,1750 470,1776 444,1750"/>
+<polyline class="e" points="444,1750 290,1750 290,1778" marker-end="url(#arr)"/>
+<text class="g" x="370" y="1742" text-anchor="middle">[all 4 PRESENT]</text>
+<polyline class="e" points="496,1750 650,1750 650,1778" marker-end="url(#arr)"/>
+<text class="g" x="570" y="1742" text-anchor="middle">[otherwise]</text>
+<rect class="act" x="170" y="1780" width="240" height="46" rx="14"/>
+<text class="t" x="290.0" y="1799.5" text-anchor="middle">Final status COMPLETED</text>
+<text class="m" x="290.0" y="1814.5" text-anchor="middle">bundle_service.py final_status()</text>
+<rect class="act" x="530" y="1780" width="240" height="46" rx="14"/>
+<text class="t" x="650.0" y="1799.5" text-anchor="middle">Final status PARTIAL_SUCCESS</text>
+<text class="m" x="650.0" y="1814.5" text-anchor="middle">bundle_service.py final_status()</text>
+<polyline class="e" points="290,1826 290,1870"/>
+<polyline class="e" points="290,1870 442,1870" marker-end="url(#arr)"/>
+<polyline class="e" points="650,1826 650,1870"/>
+<polyline class="e" points="650,1870 498,1870" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,1844 496,1870 470,1896 444,1870"/>
+<polyline class="e" points="470,1896 470,1908" marker-end="url(#arr)"/>
+<rect class="act" x="220" y="1910" width="500" height="48" rx="14"/>
+<text class="t" x="470.0" y="1930.5" text-anchor="middle">Build zip: PRESENT files under their source names + manifest.json</text>
+<text class="m" x="470.0" y="1945.5" text-anchor="middle">bundle_service.py build_archive() · no bundle_id, fixed timestamps</text>
+<polyline class="e" points="470,1958 470,1983" marker-end="url(#arr)"/>
+<rect class="act" x="270" y="1985" width="400" height="48" rx="14"/>
+<text class="t" x="470.0" y="2005.5" text-anchor="middle">Set the bundle's terminal status last</text>
+<text class="s" x="470.0" y="2020.5" text-anchor="middle">a client that sees it can rely on the manifest and zip</text>
+<polyline class="e" points="470,2033 470,2042" marker-end="url(#arr)"/>
+<polygon class="dec" points="470,2044 496,2070 470,2096 444,2070"/>
+<polyline class="e" points="470,2096 470,2113" marker-end="url(#arr)"/>
+<circle cx="470" cy="2124" r="10" fill="none" stroke="#1d2530" stroke-width="1.4"/>
+<circle class="ink" cx="470" cy="2124" r="6"/>
+</g></svg>

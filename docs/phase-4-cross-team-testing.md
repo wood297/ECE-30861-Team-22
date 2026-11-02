@@ -7,10 +7,20 @@ required fields are unchanged since Phase 2.
 
 ## 1. Results
 
+All runs on 2026-11-02 at 01:58 UTC (2026-11-01, 20:58 EST), against the deployed services.
+Team 22 was running `main@bce544c`.
+
 | Direction | Date | Run / passed | Coverage (code · component · system) | Main problem and owner |
 |---|---|---|---|---|
 | Team 22 tests → Team 24 service | 2026-11-01 | **15 / 15** (0 fail, 0 error, 0 skip) | null · 7/7 · 8/8 | None |
-| Team 24 tests → Team 22 service (`team24` profile) | 2026-11-01 | **PENDING re-run after our deploy** (see §6) | null · 7/7 · 8/8 | Two missing shared releases; fixed by Team 22, awaiting deploy |
+| Team 24 tests → Team 22 service (`team24` profile) | 2026-11-01 | **14 / 14** (0 fail, 0 error, 0 skip) | null · 7/7 · 8/8 | None. Two failures earlier the same day (missing shared releases) were fixed by Team 22 and deployed; see §6 |
+
+Reference runs of each tester against its own team's system, same time:
+
+| Run | Session | Result |
+|---|---|---|
+| Team 22 tests → Team 22 service | `07e69b27-492b-4715-8c8d-c2f775a6a017` | 15 / 15 |
+| Team 24 tests (`team24` profile) → Team 24 service | `910b12d6-017f-4e51-aaa0-2b1d1660329d` | 14 / 14 |
 
 Code coverage is `null` in both directions. Neither system is instrumented per session, and
 both explain this in the `basis` field, as the course spec allows.
@@ -96,27 +106,41 @@ matching yours.
 
 ## 6. Direction 2: Team 24 tests → Team 22 service
 
-**Final run: PENDING.** Our fix (`phase4-crossteam`, merged to `main`) deploys automatically when
-CI passes. We'll re-run your `team24` profile against the deployed commit and fill this in. For
-reference, the same code running locally passes our own tester 15/15, including the real GitHub
-lookup.
+Run 2026-11-02 01:58 UTC, session `f4999272-c733-4423-aa2c-576270ca176a`, `team24` profile,
+target `https://team22.13-58-35-224.sslip.io/system` (`main@bce544c`).
+**14 pass, 0 fail, 0 error, 0 skip.**
 
-| Run | Version | Session | Result |
-|---|---|---|---|
-| Baseline before the fix | `main@430a16b` | `88541502-fe67-4e0c-96f0-0bc26acda3d2` | 12 pass, 2 fail |
-| After the fix | `main@<commit>` | `<session>` | `<to fill>` |
+| Test | What it checks | Outcome |
+|---|---|---|
+| API-01 | 202, UUID and PENDING | pass |
+| API-02 | Missing required field → 400 | pass |
+| API-03 | Field constraints | pass |
+| API-04 | Unknown bundle → 404 | pass |
+| API-05 | Malformed bundle ID rejected | pass |
+| API-06 | Terminal status and BundleStatusResponse conformance | pass |
+| AC-01 | A bundle reflects only the requested release | pass |
+| AC-02 | Every category PRESENT, COMPLETED | pass |
+| AC-03 | Missing artifact reported as MISSING | pass |
+| AC-04 | Invalid artifact reported as INVALID, not collected | pass |
+| AC-05 | External source failure reported as INACCESSIBLE | pass |
+| AC-06 | Content byte-for-byte identical to the source | pass |
+| AC-07 | Identical inputs give equivalent results | pass |
+| AC-08 | No supported category disappears silently | pass |
 
-Baseline failures, both caused by us not serving a release yet:
+**What changed since earlier in the day.** A baseline run against `main@430a16b` (session
+`88541502-fe67-4e0c-96f0-0bc26acda3d2`) gave 12 pass and 2 fail. Both failures were ours, and both
+are fixed in `main@bce544c`:
 
 | Test | Cause | Classification | Fix |
 |---|---|---|---|
-| AC-05 | `prd-88 v1.2-github-inaccessible` didn't exist, so our system answered FAILED | System (missing shared fixture) | Release added with the GitHub source (§5) |
+| AC-05 | `prd-88 v1.2-github-inaccessible` didn't exist, so our system answered FAILED | System (missing shared fixture) | Release added, with Test Logs from GitHub at a pinned commit (§5) |
 | AC-06 | `prd-88 v2.0` didn't exist, so there was no download for the "second" release | System (missing shared fixture) | Release added, files byte-identical to yours |
 
 ## 7. Direction 1: Team 22 tests → Team 24 service
 
-Run 2026-11-02 01:46 UTC (2026-11-01 20:46 EST), session
-`b4dd758e-a185-4990-8209-9b66ecf11cf0`, target `https://30861-p3.jscarfo.com`.
+Run 2026-11-02 01:58 UTC from our registered tester
+(`https://team22.13-58-35-224.sslip.io/tester`, `main@bce544c`), session
+`6176eb87-5b54-4510-9821-0975d756dab3`, target `https://30861-p3.jscarfo.com`.
 **15 pass, 0 fail, 0 error, 0 skip.**
 
 | Test | What it checks | Outcome |
@@ -137,8 +161,8 @@ Run 2026-11-02 01:46 UTC (2026-11-01 20:46 EST), session
 | AC-07 | Two identical requests give equivalent results | pass |
 | AC-08 | Every category listed once with a valid status | pass |
 
-That run was from our updated tester code on the command line. After our deploy, we'll repeat
-it from the registered tester URL so the session comes from the deployed service.
+An earlier run of the same tester code from the command line (session
+`b4dd758e-a185-4990-8209-9b66ecf11cf0`, 01:46 UTC) gave the same 15 / 15.
 
 ## 8. Specification issues to record (Q6.2)
 
@@ -156,6 +180,13 @@ it from the registered tester URL so the session comes from the deployed service
 ## 9. Raw reports
 
 In our repository at `docs/crossteam-2026-11-01/`:
-- `final-us-vs-team24.json`: §7.
-- `team24-team24-profile-vs-us-main-430a16b.json`: §6 baseline.
-- Earlier runs from the same day, including all three of your profiles.
+
+| File | Run |
+|---|---|
+| `final-team24-vs-us-main-bce544c.json` | §6: your tester → our service, 14 / 14 |
+| `final-us-deployed-tester-vs-team24.json` | §7: our tester → your service, 15 / 15 |
+| `final-us-deployed-tester-vs-us.json` | Our tester → our service, 15 / 15 |
+| `final-team24-vs-team24.json` | Your tester → your service, 14 / 14 |
+| `team24-team24-profile-vs-us-main-430a16b.json` | §6 baseline before the fix, 12 / 14 |
+
+Earlier runs from the same day, including all three of your profiles, are in the same folder.
