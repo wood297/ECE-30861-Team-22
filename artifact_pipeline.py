@@ -24,8 +24,8 @@ from artifact_classifier import CATEGORIES, RESPONSE_SCHEMA, SYSTEM_PROMPT, LLMP
 from artifact_formats import ValidationResult, validate_artifact
 from bedrock_adapter import BedrockProvider, BedrockProviderError
 from github_artifact_retrieval import EXTERNAL_SOURCE as GITHUB_SOURCE
-from github_artifact_retrieval import RetrievalResult, fetch_configured_artifact
-from github_client import GitHubClient, GitHubConfig
+from github_artifact_retrieval import GitHubArtifactRetriever, RetrievalResult, fetch_configured_artifact
+from github_client import GitHubClient, GitHubConfig, GitHubError
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,10 @@ STANDARD_NAMES: dict[str, tuple[str, ...]] = {
     for category, filename in EXPECTED_FILES.items()
 }
 STANDARD_NAMES["SBOM"] = ("sbom.json", "sbom.xml", "sbom.md", "sbom.html")
+GITHUB_CANDIDATES = (
+    ("SBOM", (("sbom.json", "cyclonedx-json"), ("sbom.xml", "cyclonedx-xml"))),
+    ("User Instructions", (("user_instructions.md", "markdown"), ("user_instructions.html", "html"))),
+)
 
 MAX_FILES_TO_CLASSIFY = 10
 MAX_CLASSIFIED_BYTES = 1_048_576
@@ -118,11 +122,14 @@ def clear_github_cache():
         _github_cache.clear()
 
 
-def make_github_client(repository: str) -> GitHubClient:
-    """Real client for a catalog's repository. Uses GITHUB_TOKEN when set, otherwise reads
-    anonymously, which works for public repositories. Tests replace this function."""
-    config = GitHubConfig(token=os.environ.get("GITHUB_TOKEN", ""), repository=repository,
-                          timeout=GITHUB_TIMEOUT, allow_anonymous=True)
+def get_github_token(repository: str) -> str:
+    """Supply credentials for the selected repository."""
+    return os.environ.get("GITHUB_TOKEN", "")
+
+
+def make_github_client(repository: str, *, allow_anonymous: bool = True) -> GitHubClient:
+    config = GitHubConfig(token=get_github_token(repository), repository=repository,
+                          timeout=GITHUB_TIMEOUT, allow_anonymous=allow_anonymous)
     return GitHubClient(config)
 
 
@@ -361,6 +368,29 @@ def decide_github(entry: dict, category: str, product: str, release: str,
     return _decide_standard_file(SourceFile(name, data=result.original_bytes), category, provider)
 
 
+def decide_dynamic_github(source: dict, product: str, release: str,
+                          provider: LLMProvider | None) -> dict[str, Decision]:
+    try:
+        client = make_github_client(source["repository"], allow_anonymous=False)
+    except GitHubError:
+        return {
+            category: Decision("INACCESSIBLE", detail="GitHub credentials could not be configured.")
+            for category, _ in GITHUB_CANDIDATES
+        }
+
+    retriever = GitHubArtifactRetriever(client, revision=source["revision"], candidates=GITHUB_CANDIDATES)
+    decisions = {}
+    for result in retriever.retrieve(product, release):
+        name = PurePath(result.path).name if result.path else None
+        if result.outcome == "RETRIEVED":
+            decisions[result.category] = _decide_standard_file(
+                SourceFile(name, data=result.original_bytes), result.category, provider)
+        else:
+            decisions[result.category] = Decision(
+                result.outcome, name, detail=result.source_failure_detail)
+    return decisions
+
+
 def list_fixture_files(product: str, release: str) -> list[SourceFile] | None:
     """Every file directly in the release's folder, or None when the folder doesn't exist."""
     folder = FIXTURES_ROOT / product / release
@@ -381,6 +411,7 @@ def list_fixture_files(product: str, release: str) -> list[SourceFile] | None:
 def retrieve_and_classify(bundle):
     product = bundle["product_id"]
     release = bundle["release_version"]
+    github = bundle.get("github")
 
     # Safety: don't let someone send "../../something" as a version
     if "/" in product or "/" in release or ".." in product or ".." in release:
@@ -389,18 +420,24 @@ def retrieve_and_classify(bundle):
         return bundle
 
     files = list_fixture_files(product, release)
-    if files is None:
+    if files is None and github is None:
         bundle["error"] = f"No documents found for {product} {release}"
         bundle["status"] = "FAILED"
         return bundle
 
     provider = get_provider()
-    decisions = decide(files, provider)
+    decisions = decide(files or [], provider)
     sources = {category: SOURCE_NAME for category in decisions}
-    for category, entry in CATALOG.get(f"{product}/{release}", {}).items():
-        if entry.get("source") == "github" and category in decisions:
-            decisions[category] = decide_github(entry, category, product, release, provider)
+    if github is not None:
+        github_decisions = decide_dynamic_github(github, product, release, provider)
+        decisions.update(github_decisions)
+        for category in github_decisions:
             sources[category] = GITHUB_SOURCE
+    else:
+        for category, entry in CATALOG.get(f"{product}/{release}", {}).items():
+            if entry.get("source") == "github" and category in decisions:
+                decisions[category] = decide_github(entry, category, product, release, provider)
+                sources[category] = GITHUB_SOURCE
 
     artifacts = []
     manifest = []

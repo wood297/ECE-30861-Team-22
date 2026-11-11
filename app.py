@@ -1,10 +1,12 @@
 import copy
 import io
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, url_for
 from bundle_service import archives, process_bundle_safely
+from github_client import GitHubConfig, GitHubError
 from selftest import create_test_blueprint
 
 VERSION_FILE = Path(__file__).parent / "VERSION"
@@ -43,7 +45,7 @@ def version():
 def create_bundle():
     data = request.get_json()
 
-    if not data:
+    if not isinstance(data, dict) or not data:
         return jsonify({"error": "Request body must contain JSON"}), 400
 
     if not isinstance(data.get("product_id"), str) or not data["product_id"].strip():
@@ -51,6 +53,27 @@ def create_bundle():
 
     if not isinstance(data.get("release_version"), str) or not data["release_version"].strip():
         return jsonify({"error": "release_version is required and must be a nonempty string"}), 400
+
+    github = None
+    if "github" in data:
+        source = data["github"]
+        if not isinstance(source, dict):
+            return jsonify({"error": "github must be an object"}), 400
+        repository, revision = source.get("repository"), source.get("revision")
+        try:
+            # Validate the repository syntax without reading server credentials.
+            GitHubConfig(token="", repository=repository, allow_anonymous=True)
+        except GitHubError:
+            return jsonify({"error": "github.repository must be in owner/repo form"}), 400
+        if not isinstance(revision, str) or not revision or any(
+            c.isspace() or ord(c) < 32 or ord(c) == 127 for c in revision
+        ):
+            return jsonify({"error": "github.revision must be a nonempty Git tag or commit"}), 400
+        for field in ("product_id", "release_version"):
+            value = data[field]
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value) or ".." in value:
+                return jsonify({"error": f"{field} must be a safe path segment for GitHub"}), 400
+        github = {"repository": repository, "revision": revision}
 
     bundle_id = str(uuid.uuid4())
 
@@ -62,6 +85,8 @@ def create_bundle():
         "manifest": [],
         "artifacts": []
     }
+    if github is not None:
+        bundle["github"] = github
 
     bundles[bundle_id] = bundle
     # Spec 5.1: the 202 acknowledges the queued task as PENDING; results come from GET

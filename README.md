@@ -22,7 +22,7 @@ The Phase 4 system consists of the following components:
 | Component | Function |
 |---|---|
 | Flask API | Handles documentation requests and exposes processing results |
-| GitHub Connector | Connected through `source_catalog.json`: a category can point at one file in a GitHub repository at a pinned commit. Used today only for the pod's source-failure fixture (`prd-88 v1.2-github-inaccessible`, Test Logs). Pulling real releases from `prithika-sundar/cra-artifact-test` is planned for Phase 5 |
+| GitHub Connector | Reads CycloneDX SBOMs and User Instructions from the repository and revision supplied to `POST /bundles`. Requests without a GitHub source use the local fixtures and any pinned overrides in `source_catalog.json`. |
 | Format Validator | Validates Markdown, HTML, and CycloneDX JSON/XML |
 | Bedrock Classifier | Uses `openai.gpt-oss-20b` on AWS Bedrock to classify documents with a non-standard name or without the proper heading |
 | Bundle Generator | Creates the documentation manifest and ZIP bundle |

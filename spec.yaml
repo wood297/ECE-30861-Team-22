@@ -13,6 +13,9 @@ info:
       can point a category at one file in a GitHub repository at a pinned commit instead. Today
       only `prd-88 v1.2-github-inaccessible` Test Logs does, and that file is not at the pinned
       commit, so it is reported INACCESSIBLE (the pod's Phase 4 source-failure fixture).
+    - An explicit GitHub source supplies the SBOM and User Instructions from committed files
+      under `artifacts/<product_id>/<release_version>/`. Risk Assessment and Test Logs still
+      use local fixtures when available. The server uses `GITHUB_TOKEN` for these requests.
     - `POST /bundles` answers `202 PENDING` straight away and the bundle is processed in the
       background, so poll `GET /bundles/{bundle_id}` until the status is `COMPLETED`,
       `PARTIAL_SUCCESS` or `FAILED`.
@@ -312,6 +315,21 @@ components:
           minLength: 1
           description: Specific version identifier for the product release. Must not be blank.
           example: "v1.2"
+        github:
+          $ref: '#/components/schemas/GitHubSource'
+
+    GitHubSource:
+      type: object
+      required: [repository, revision]
+      properties:
+        repository:
+          type: string
+          description: GitHub repository in owner/repo form.
+          example: prithika-sundar/cra-artifact-test
+        revision:
+          type: string
+          description: Git tag or commit containing the release directory.
+          example: f6d381dc6ddb716e1603230a85ea300de462d252
 
     BundleTaskResponse:
       type: object
@@ -324,6 +342,8 @@ components:
           type: string
         release_version:
           type: string
+        github:
+          $ref: '#/components/schemas/GitHubSource'
         status:
           type: string
           enum: [PENDING]
@@ -361,13 +381,13 @@ components:
           enum: [PRESENT, MISSING, INVALID, INACCESSIBLE]
           description: |
             PRESENT: a valid document that the rules or the classifier accepted for this category.
-            MISSING: no file, and no external source is configured for the category. INVALID: the
+            MISSING: no file was found in the fixtures or requested GitHub release. INVALID: the
             file has an unsupported format, fails format validation, belongs to another category, or
             could not be confirmed. INACCESSIBLE: the file exists but could not be read, or the
             configured external source failed or does not have the file at the pinned commit.
         external_source:
           type: string
-          description: The source queried for this artifact. `fixtures` for the local fixtures folder, `GitHub` for a file configured in `source_catalog.json`.
+          description: The source queried for this artifact, either `fixtures` or `GitHub`.
           example: "fixtures"
         source_failure_detail:
           type: string
@@ -418,6 +438,8 @@ components:
         release_version:
           type: string
           description: The release version from the request.
+        github:
+          $ref: '#/components/schemas/GitHubSource'
         status:
           type: string
           enum: [PENDING, PROCESSING, COMPLETED, PARTIAL_SUCCESS, FAILED]
