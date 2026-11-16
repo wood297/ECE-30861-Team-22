@@ -4,13 +4,32 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, url_for
-from bundle_service import archives, process_bundle_safely
+from bundle_service import BUNDLE_TTL_SECONDS, MAX_BUNDLE_BYTES, MAX_BUNDLES, archives, process_bundle_safely
+from expiring_store import ExpiringStore
 from selftest import create_test_blueprint
 
 VERSION_FILE = Path(__file__).parent / "VERSION"
 
+# Largest request body accepted; bigger ones get 413 before being read into memory
+MAX_REQUEST_BYTES = 1024 * 1024
+
+
+def bundle_size(bundle: dict) -> int:
+    """Approximate memory a bundle holds: its artifact content plus a little for the rest."""
+    return 1024 + sum(len(artifact.get("content") or "") for artifact in bundle.get("artifacts") or [])
+
+
+def drop_archive(bundle_id: str, _bundle: dict) -> None:
+    archives.pop(bundle_id)
+
+
 app = Flask(__name__)
-bundles: dict[str, dict] = {}
+app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
+# Bundles expire after an hour, and the oldest go first past the caps. Removing a bundle also
+# removes its archive, so a download never outlives the bundle it belongs to.
+bundles: ExpiringStore[str, dict] = ExpiringStore(
+    BUNDLE_TTL_SECONDS, MAX_BUNDLES, max_bytes=MAX_BUNDLE_BYTES, size_of=bundle_size,
+    on_evict=drop_archive)
 # Classifying a bundle can take a while, so requests don't wait for it. Tests can set
 # PROCESS_BUNDLES_INLINE to read results straight after the POST.
 executor = ThreadPoolExecutor(max_workers=4)
@@ -76,11 +95,13 @@ def create_bundle():
 
 @app.route("/bundles/<bundle_id>", methods=["GET"])
 def get_bundle(bundle_id):
-    if bundle_id not in bundles:
+    # One lookup each, so an entry expiring between a check and a read can't cause a KeyError
+    bundle = bundles.get(bundle_id)
+    if bundle is None:
         return jsonify({"error": "Bundle not found"}), 404
 
-    body = dict(bundles[bundle_id])
-    if bundle_id in archives:
+    body = dict(bundle)
+    if archives.get(bundle_id) is not None:
         # Absolute, so it still resolves when the app is mounted under /system (wsgi.py)
         body["download_url"] = url_for("download_bundle", bundle_id=bundle_id, _external=True)
     return jsonify(body), 200
@@ -88,10 +109,11 @@ def get_bundle(bundle_id):
 @app.route("/bundles/<bundle_id>/download", methods=["GET"])
 def download_bundle(bundle_id):
     # FAILED bundles have no archive, so they 404 here too
-    if bundle_id not in archives:
+    archive = archives.get(bundle_id)
+    if archive is None:
         return jsonify({"error": "Bundle archive not found"}), 404
 
-    return send_file(io.BytesIO(archives[bundle_id]), mimetype="application/zip",
+    return send_file(io.BytesIO(archive), mimetype="application/zip",
                      as_attachment=True, download_name=f"bundle-{bundle_id}.zip")
 
 if __name__ == "__main__":

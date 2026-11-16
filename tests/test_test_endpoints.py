@@ -209,7 +209,7 @@ def test_tester_setup_forwards_a_system_setup_error(monkeypatch, status, body):
 
     assert response.status_code == status
     assert response.get_json() == body
-    assert service._sessions == {}
+    assert len(service._sessions) == 0
 
 
 def test_tester_setup_reports_a_target_without_test_endpoints(monkeypatch):

@@ -4,12 +4,21 @@ import logging
 import zipfile
 
 from artifact_pipeline import retrieve_and_classify
+from expiring_store import ExpiringStore
 
 logger = logging.getLogger(__name__)
 
+# How long a bundle and its archive stay available, and how many can exist at once. Anyone can
+# create bundles without logging in, so these keep memory bounded (Phase 5 plan, step 1.1).
+BUNDLE_TTL_SECONDS = 3600
+MAX_BUNDLES = 500
+MAX_BUNDLE_BYTES = 64 * 1024 * 1024
+
 # bundle_id -> zip archive (bytes) of the generated bundle, served by GET /bundles/<id>/download.
-# Kept in memory for Phase 3, so a restart clears it along with the bundles.
-archives: dict[str, bytes] = {}
+# Kept in memory, so a restart clears it along with the bundles. app.py also removes an archive
+# when its bundle is removed.
+archives: ExpiringStore[str, bytes] = ExpiringStore(BUNDLE_TTL_SECONDS, MAX_BUNDLES,
+                                                    max_bytes=MAX_BUNDLE_BYTES, size_of=len)
 
 # Every entry gets the same timestamp, so identical inputs give byte-identical archives (AC-07)
 ARCHIVE_TIMESTAMP = (1980, 1, 1, 0, 0, 0)

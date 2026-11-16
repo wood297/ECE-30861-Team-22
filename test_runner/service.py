@@ -15,8 +15,8 @@ Optional fields: "token" on setup (sent to the target as a Bearer token); "poll_
 (seconds to wait for a terminal bundle status, default 5) and "only" (list of test ids)
 on run. Errors are {"message": ..., "source": "tester" | "system" | "communication" | "unknown"}.
 
-Sessions and reports live in memory until the process stops, so run a single process
-(one gunicorn worker) in production.
+Sessions and reports live in memory, so run a single process (one gunicorn worker) in
+production. Anyone can create sessions, so they expire after an hour and are capped, oldest first.
 
 Run locally with: python -m test_runner.service --port 5001
 """
@@ -27,15 +27,23 @@ from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request
 
+from expiring_store import ExpiringStore
 from test_runner.client import HttpClient
 from test_runner.session import SetupError, setup_target
 from test_runner.suite import aborted_report, run_suite
 
-app = Flask(__name__)
+SESSION_TTL_SECONDS = 3600
+MAX_SESSIONS = 200
+# Largest request body accepted; bigger ones get 413 before being read into memory
+MAX_REQUEST_BYTES = 1024 * 1024
 
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
+
+# Guards a session's state changes (ready -> running -> done); the store has its own lock
 _lock = threading.Lock()
 # session_id -> {"target_url", "token", "state": ready|running|done|aborted, "report"}
-_sessions: dict[str, dict] = {}
+_sessions: ExpiringStore[str, dict] = ExpiringStore(SESSION_TTL_SECONDS, MAX_SESSIONS)
 
 
 def make_client(url, token=None):

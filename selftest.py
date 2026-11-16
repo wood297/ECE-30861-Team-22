@@ -20,7 +20,6 @@ import os
 import subprocess  # runs only our own pytest suite (run_internal_tests)  # nosec B404
 import sys
 import tempfile
-import threading
 import time
 import uuid
 import xml.etree.ElementTree as ET  # parses only the JUnit file our own pytest run wrote  # nosec B405
@@ -30,6 +29,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 import artifact_pipeline
+from expiring_store import ExpiringStore
 
 REPO_ROOT = Path(__file__).parent
 # Set while a self-test is running so a test that calls /test/selftest cannot recurse
@@ -39,8 +39,11 @@ SELFTEST_ENABLE_ENV = "CRA_ENABLE_SELFTEST"
 CODE_COVERAGE_BASIS = ("Source lines; per-session code coverage instrumentation is not implemented "
                        "yet, so counts are unavailable")
 
-_lock = threading.Lock()
-_sessions: dict[str, dict] = {}
+# Anyone can create sessions, so they expire after an hour and are capped, oldest first
+SESSION_TTL_SECONDS = 3600
+MAX_SESSIONS = 1000
+
+_sessions: ExpiringStore[str, dict] = ExpiringStore(SESSION_TTL_SECONDS, MAX_SESSIONS)
 _last_report = {"report": None}
 
 
@@ -130,10 +133,9 @@ def create_test_blueprint():
         if not fixtures:
             return error("Could not prepare the session: the fixture source is missing or empty", 500)
 
-        with _lock:
-            if session_id in _sessions:
-                return error(f"Session {session_id} already exists", 409)
-            _sessions[session_id] = {"created_at": datetime.now(timezone.utc).isoformat(), "setup": setup_data}
+        session = {"created_at": datetime.now(timezone.utc).isoformat(), "setup": setup_data}
+        if not _sessions.add(session_id, session):
+            return error(f"Session {session_id} already exists", 409)
         return jsonify({"session_id": session_id, "fixtures": fixtures}), 201
 
     @bp.route("/report", methods=["GET"])
@@ -141,9 +143,8 @@ def create_test_blueprint():
         session_id = request.args.get("session_id")
         if not isinstance(session_id, str) or not session_id.strip():
             return error("session_id query parameter is required", 400)
-        with _lock:
-            if session_id not in _sessions:
-                return error(f"Unknown session {session_id}", 404)
+        if session_id not in _sessions:
+            return error(f"Unknown session {session_id}", 404)
         return jsonify({
             "session_id": session_id,
             "coverage": {"code": {"covered": None, "total": None, "basis": CODE_COVERAGE_BASIS}},
