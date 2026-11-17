@@ -12,7 +12,10 @@ A secret comes back as a `Secret`, whose repr and str never show the value, so i
 through a log line, an error or a debug print. Only `reveal()` gives the value, and only a
 connector, about to send it, should call it.
 """
+import json
+import os
 import re
+import stat
 import threading
 from typing import Any, Protocol
 
@@ -140,6 +143,56 @@ class InMemorySecretStore(_Paths):
             if path not in self._values:
                 raise SecretNotFound("secret not found")
             return Secret(self._values[path])
+
+
+class LocalFileSecretStore(_Paths):
+    """Read-only secrets from a local JSON file, for connector authors on their laptops
+    (CRA_LOCAL_SECRETS, Phase 5 plan §11.3). Development only: the server never sets it.
+
+        {"connections": {"<conn_id>": "<token>"}, "app": {"<name>": "<value>"}}
+
+    The file must not be readable by other users, and must never be committed (.gitignore
+    covers *.secrets.json). Any organization reads the same connection secrets: locally there
+    is only one company.
+    """
+
+    def __init__(self, path: str, prefix: str = "/team22-cra-local"):
+        self.prefix = check_prefix(prefix)
+        if os.name == "posix" and os.stat(path).st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+            raise SecretStoreError(f"{path} is readable by other users; run: chmod 600 {path}")
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if not isinstance(data, dict):
+            raise SecretStoreError(f"{path} must hold a JSON object")
+        self._connections = {check_uuid(k, "conn_id"): _check_value(v)
+                             for k, v in (data.get("connections") or {}).items()}
+        self._app = {k: _check_value(v) for k, v in (data.get("app") or {}).items()}
+        for name in self._app:
+            self._app_path(name)
+
+    def get_connection_secret(self, org_id: str, conn_id: str) -> Secret:
+        self.connection_path(org_id, conn_id)   # same id checks as the real stores
+        if conn_id not in self._connections:
+            raise SecretNotFound("secret not found")
+        return Secret(self._connections[conn_id])
+
+    def get_app_secret(self, name: str) -> Secret:
+        self._app_path(name)
+        if name not in self._app:
+            raise SecretNotFound("secret not found")
+        return Secret(self._app[name])
+
+    def put_connection_secret(self, org_id: str, conn_id: str, value: str) -> str:
+        raise SecretStoreError("local secrets are read-only; edit the CRA_LOCAL_SECRETS file")
+
+    def put_app_secret(self, name: str, value: str) -> None:
+        raise SecretStoreError("local secrets are read-only; edit the CRA_LOCAL_SECRETS file")
+
+    def delete_connection_secret(self, org_id: str, conn_id: str) -> None:
+        raise SecretStoreError("local secrets are read-only; edit the CRA_LOCAL_SECRETS file")
+
+    def delete_org_secrets(self, org_id: str) -> int:
+        raise SecretStoreError("local secrets are read-only; edit the CRA_LOCAL_SECRETS file")
 
 
 class SsmSecretStore(_Paths):

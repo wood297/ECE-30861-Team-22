@@ -6,3 +6,6 @@ VERSION
 .env
 .env.*
 !.env.example
+# Connector authors' local tokens (CRA_LOCAL_SECRETS) and connections (connectors/try_fetch.py)
+*.secrets.json
+*.local.json
