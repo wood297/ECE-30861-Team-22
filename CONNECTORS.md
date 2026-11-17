@@ -2,6 +2,8 @@
 
 A connector fetches **one file for one category from one source** (GitHub, Confluence, Jenkins). That's all it does. The code around it resolves products and releases, decides statuses, validates formats, runs Bedrock, caches results, and handles AWS, logins and organizations. You never touch any of that.
 
+> **Branch:** the kit isn't on `main` yet. Branch from `person3-bounded-memory`, and open your PR **against `person3-bounded-memory`**, not `main`.
+
 The contract is in [`connectors/base.py`](connectors/base.py). Read these three files first, in this order:
 
 | File | What it shows |
@@ -138,7 +140,7 @@ Also add a **live check script** (like `github_live_check.py`) that fetches the 
 
 ## 5. Hand it back
 
-Open a PR containing:
+Open a PR against `person3-bounded-memory` (not `main`, for now) containing:
 - `connectors/<type>.py` and its `REGISTRY` line
 - `tests/test_connector_<type>.py`, passing, with the contract subclass and your own tests
 - the live check script and how to run it
@@ -154,15 +156,17 @@ CI runs `ruff`, `mypy`, `bandit` and `pytest`, so run them locally first.
 |---|---|---|
 | The pipeline calling connectors for a product's release, so a bundle shows your file | 2.1 | `try_fetch` and the contract tests |
 | `test_account.json`, `pod-test` and `CRA_TEST_ACCOUNT` (a full local bundle with `python app.py`) | 2.2 | As above |
-| GitHub App installation tokens | 0.5 / 3.1 | `ctx.secret()` is a personal access token locally. On the server it will be a short-lived installation token, made by the platform. The connector code doesn't change |
 
 ## Moving a prototype onto the contract
 
-- **GitHub** (`feature/dynamic-github-connector`): the retrieval logic carries over, i.e. the candidate names and "only a confirmed absence tries the next name". Changes:
-  - the repository and revision become `settings` and `ref` fields, so drop the `github` field on `POST /bundles`, plus its `spec.yaml` and README changes
-  - `GITHUB_TOKEN` becomes `ctx.secret()`
-  - `GitHubClient` requests go through `ctx.http`
-  - pin `revision` to a commit SHA
+- **GitHub** (`github_client.py`, `github_artifact_retrieval.py`, and `feature/dynamic-github-connector`): token-based, with no GitHub App. Each connection holds one repository and a **fine-grained, read-only token** for it.
+  - **Settings:** `repository` (`owner/name`, reuse `GitHubConfig`'s check), plus `token` as the secret field.
+  - **Ref:** `revision`, a 40-character commit SHA (pattern `[0-9a-f]{40}`), and `paths`, candidates like `artifacts/{product}/{release}/sbom.json`.
+  - **Keep** `get_file`'s tree-then-blob walk and its rule that only a complete tree establishes absence. `ConfirmedArtifactMissing` on every candidate becomes `not_found`.
+  - **Swap** urllib for `ctx.http` (`allowed_hosts` = `["api.github.com"]`) and `GITHUB_TOKEN` for `ctx.secret()`. Drop `allow_anonymous`.
+  - **Errors:** 401/403 and a repository 404 become `auth_failed`; a rate limit (429, or 403 with `x-ratelimit-remaining: 0`), 5xx or timeout becomes `unavailable` (check the rate limit before treating 403 as auth); malformed tree or blob data becomes `source_error`.
+  - **Drop** the `github` field on `POST /bundles`, plus its `spec.yaml` and README changes. The repository now comes from the company's connection.
+  - **Version:** return the commit SHA as `version`.
 - **Confluence** (`codex/confluence-attachment-reader`): `fetch_attachment` is most of `fetch()`. Changes:
   - `cloud_id` and `email` become settings, and the token becomes the secret field
   - urllib becomes `ctx.http`; it already checks the download redirect before following it, which matches rule 3
