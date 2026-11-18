@@ -8,6 +8,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 from connectors.base import Connector, FetchContext
 from connectors.fixtures import FixturesConnector
+from connectors.confluence import ConfluenceConnector
 from safe_http import DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT, ByteBudget, IPNetwork, SafeHttpClient
 from secret_store import SecretStore
 from tenant_store import Connection
@@ -15,7 +16,7 @@ from tenant_store import Connection
 REGISTRY: dict[str, Connector] = {
     "fixtures": FixturesConnector(),
     # "github": GitHubConnector(),
-    # "confluence": ConfluenceConnector(),
+    "confluence": ConfluenceConnector(),
     # "jenkins": JenkinsConnector(),
 }
 
