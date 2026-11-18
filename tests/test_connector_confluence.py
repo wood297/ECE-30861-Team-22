@@ -72,6 +72,16 @@ class TestConfluenceContract(HttpConnectorContract):
         assert self.fetch(source).outcome == SOURCE_ERROR
         assert len(source.requests) == 1
 
+    @pytest.mark.parametrize("version_status,expected", [(404, NOT_FOUND), (200, SOURCE_ERROR)])
+    def test_download_400_confirms_version_absence(self, version_status, expected):
+        def handler(request):
+            if "/versions/" in request.target:
+                return FakeResponse(version_status)
+            if "/download?" in request.target:
+                return FakeResponse(400)
+            return self.serve_file(request)
+        assert self.fetch(FakeSource(handler)).outcome == expected
+
     @pytest.mark.parametrize("version", [0, -1])
     def test_requires_positive_version(self, version):
         with pytest.raises(SettingsError):
