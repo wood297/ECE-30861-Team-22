@@ -41,3 +41,27 @@ DynamoDB table or the full bundle path is operational.
 Tests use a fake network through safe_http. Run:
 
     python -m pytest -q tests/test_connector_confluence.py
+
+## Expanded live suite
+
+    python -m confluence_live_suite --email YOUR_ATLASSIAN_EMAIL
+
+Enter a scoped token once at the hidden prompt. The runner executes eleven cases
+on Confluence page 2457601 and exits nonzero if any expectation fails. A case
+passes only if retrieval outcome, exact bytes, pinned filename/version, format
+validation code and first risk-assessment heading match the manifest.
+
+The suite includes three substantial synthetic assessments, an HTML assessment,
+whitespace-only content (Confluence refuses zero-byte uploads), invalid UTF-8,
+an unsupported text file, wrong-category content, two revisions of the firmware
+assessment, an absent filename and an absent attachment version.
+
+Files with invalid content should still be RETRIEVED correctly. The next format
+or heading check rejects them. This runner exercises deterministic checks.
+Bedrock semantic classification, ambiguous multi-file selection, user login and
+bundle generation need their own integration tests. Network outages, rejected
+credentials and unsafe redirects are covered by the automated connector tests.
+
+The firmware attachment was uploaded twice with distinct bytes. A live run must
+verify both pinned versions and will expose any unexpected history behavior.
+The expanded suite has not been run with a live token by the agent.
