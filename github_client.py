@@ -6,7 +6,9 @@ import json
 import os
 import re
 import socket
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -22,6 +24,26 @@ class GitHubError(Exception):
 
 class ConfirmedArtifactMissing(Exception):
     """A complete Git tree established absence at the requested revision."""
+
+
+REPOSITORY_PATTERN = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9_.-]+"
+PATH_SEGMENT_PATTERN = r"[A-Za-z0-9][A-Za-z0-9._-]*"
+SHA_PATTERN = r"[0-9a-f]{40}"
+
+
+def valid_repository(value: object) -> bool:
+    return (isinstance(value, str) and re.fullmatch(REPOSITORY_PATTERN, value) is not None
+            and value.rsplit("/", 1)[-1] not in {".", ".."})
+
+
+def valid_path(value: object) -> bool:
+    return isinstance(value, str) and all(
+        re.fullmatch(PATH_SEGMENT_PATTERN, part) and ".." not in part for part in value.split("/")
+    )
+
+
+def valid_sha(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(SHA_PATTERN, value) is not None
 
 
 @dataclass(frozen=True)
@@ -40,10 +62,7 @@ class GitHubConfig:
             raise GitHubError("configuration", "Set GITHUB_TOKEN before verifying access.")
         if self.token and any(character.isspace() for character in self.token):
             raise GitHubError("configuration", "GITHUB_TOKEN must not contain whitespace.")
-        if not isinstance(self.repository, str) or not re.fullmatch(
-            r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9_.-]+",
-            self.repository,
-        ) or self.repository.split("/")[-1] in {".", ".."}:
+        if not valid_repository(self.repository):
             raise GitHubError("configuration", "Set GITHUB_REPOSITORY to owner/repository.")
         if not 0 < self.timeout <= 60:
             raise GitHubError("configuration", "GitHub timeout must be greater than 0 and at most 60 seconds.")
@@ -127,70 +146,13 @@ class GitHubClient:
         retains _get's 1 MiB cap (base64 overhead reduces maximum artifact size).
         No retries or caching are introduced; use a commit SHA for repeatable calls.
         """
-        if not isinstance(path, str) or not path or any(
-            not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", part) or ".." in part
-            for part in path.split("/")
-        ):
+        if not valid_path(path):
             raise GitHubError("configuration", "File path must contain safe relative path segments.")
         if not isinstance(ref, str) or not ref.strip() or any(ord(c) < 32 or ord(c) == 127 for c in ref):
             raise GitHubError("configuration", "An explicit Git revision is required.")
         base = "/repos/" + self.config.repository + "/git/"
 
-        def invalid():
-            return GitHubError("upstream_response", "GitHub returned invalid file metadata.")
-
-        def valid_sha(value):
-            return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40}", value) is not None
-
-        tree_ref = quote(ref, safe="")
-        parts = path.split("/")
-        for index, part in enumerate(parts):
-            tree = self._get(base + "trees/" + tree_ref)
-            if not valid_sha(tree.get("sha")) or tree.get("truncated") is not False:
-                raise invalid()
-            if index and tree["sha"] != tree_ref:
-                raise invalid()
-            entries = tree.get("tree")
-            if not isinstance(entries, list):
-                raise invalid()
-            names = set()
-            selected = None
-            modes = {"tree": {"040000"}, "blob": {"100644", "100755", "120000"}, "commit": {"160000"}}
-            for entry in entries:
-                if not isinstance(entry, dict):
-                    raise invalid()
-                name = entry.get("path")
-                kind = entry.get("type")
-                if (not isinstance(name, str) or not name or "/" in name or name in names
-                        or not isinstance(kind, str) or kind not in modes
-                        or not isinstance(entry.get("mode"), str)
-                        or entry.get("mode") not in modes[kind] or not valid_sha(entry.get("sha"))):
-                    raise invalid()
-                names.add(name)
-                if name == part:
-                    selected = entry
-            if selected is None:
-                raise ConfirmedArtifactMissing("File absent from the requested Git tree.")
-            if index < len(parts) - 1:
-                if selected["type"] != "tree":
-                    raise invalid()
-                tree_ref = selected["sha"]
-                continue
-            if selected["type"] != "blob" or selected["mode"] not in {"100644", "100755"}:
-                raise invalid()
-            blob = self._get(base + "blobs/" + selected["sha"])
-            if (blob.get("sha") != selected["sha"] or blob.get("encoding") != "base64"
-                    or not isinstance(blob.get("content"), str) or type(blob.get("size")) is not int
-                    or not 0 <= blob["size"] <= 1_048_576):
-                raise invalid()
-            try:
-                data = base64.b64decode(blob["content"].replace("\n", "").replace("\r", ""), validate=True)
-            except (ValueError, binascii.Error):
-                raise invalid() from None
-            if len(data) != blob["size"]:
-                raise invalid()
-            return data
-        raise invalid()
+        return read_git_file(self._get, base, path, quote(ref, safe=""))
 
     def verify_access(self):
         """Validate the token, then check repository metadata visibility.
@@ -207,3 +169,59 @@ class GitHubClient:
         if not isinstance(name, str) or name.casefold() != self.config.repository.casefold():
             raise GitHubError("upstream_response", "GitHub returned an unexpected repository.")
         return {"status": "connected", "user": user["login"], "repository": name}
+
+
+def read_git_file(get: Callable[[str], dict[str, Any]], base: str, path: str, tree_ref: str, *,
+                  exact_root: bool = False) -> bytes:
+    """Walk nonrecursive Git trees and decode a regular blob using the caller's transport."""
+    def invalid():
+        return GitHubError("upstream_response", "GitHub returned invalid file metadata.")
+
+    parts = path.split("/")
+    for index, part in enumerate(parts):
+        tree = get(base + "trees/" + tree_ref)
+        if not valid_sha(tree.get("sha")) or tree.get("truncated") is not False:
+            raise invalid()
+        if (index or exact_root) and tree["sha"] != tree_ref:
+            raise invalid()
+        entries = tree.get("tree")
+        if not isinstance(entries, list):
+            raise invalid()
+        names = set()
+        selected = None
+        modes = {"tree": {"040000"}, "blob": {"100644", "100755", "120000"}, "commit": {"160000"}}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise invalid()
+            name = entry.get("path")
+            kind = entry.get("type")
+            if (not isinstance(name, str) or not name or "/" in name or name in names
+                    or not isinstance(kind, str) or kind not in modes
+                    or not isinstance(entry.get("mode"), str)
+                    or entry.get("mode") not in modes[kind] or not valid_sha(entry.get("sha"))):
+                raise invalid()
+            names.add(name)
+            if name == part:
+                selected = entry
+        if selected is None:
+            raise ConfirmedArtifactMissing("File absent from the requested Git tree.")
+        if index < len(parts) - 1:
+            if selected["type"] != "tree":
+                raise invalid()
+            tree_ref = selected["sha"]
+            continue
+        if selected["type"] != "blob" or selected["mode"] not in {"100644", "100755"}:
+            raise invalid()
+        blob = get(base + "blobs/" + selected["sha"])
+        if (blob.get("sha") != selected["sha"] or blob.get("encoding") != "base64"
+                or not isinstance(blob.get("content"), str) or type(blob.get("size")) is not int
+                or not 0 <= blob["size"] <= 1_048_576):
+            raise invalid()
+        try:
+            data = base64.b64decode(blob["content"].replace("\n", "").replace("\r", ""), validate=True)
+        except (ValueError, binascii.Error):
+            raise invalid() from None
+        if len(data) != blob["size"]:
+            raise invalid()
+        return data
+    raise invalid()

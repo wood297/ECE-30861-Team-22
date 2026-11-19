@@ -80,3 +80,83 @@ Do not break working credentials to manufacture live failures. Offline tests in
 `tests/test_github_live_check.py` separately demonstrate authentication and permission
 failures. GitHub may hide a denied private repository behind a 404, so a live
 permission denial cannot always be distinguished from repository unavailability.
+
+## Shared GitHub connector
+
+Create `github.local.json` with a repository, a full lowercase commit SHA, and
+the artifact paths in priority order. The live check expands `{product}` and
+`{release}` using the command-line arguments before calling the connector.
+
+```json
+{
+  "type": "github",
+  "conn_id": "6f1c1d2e-0000-4000-8000-000000000001",
+  "settings": {"repository": "owner/repository"},
+  "ref": {
+    "revision": "0123456789abcdef0123456789abcdef01234567",
+    "paths": ["artifacts/{product}/{release}/sbom.json"]
+  }
+}
+```
+
+Use the same connection ID in `github.secrets.json` and set file permissions
+with `chmod 600 github.secrets.json`. Use a fine-grained token with read-only
+Contents access to the configured repository.
+
+```json
+{"connections": {"6f1c1d2e-0000-4000-8000-000000000001": "<token>"}}
+```
+
+Copy the expected artifact bytes from a trusted checkout at the pinned commit.
+From the repository root, run:
+
+```sh
+CRA_LOCAL_SECRETS=github.secrets.json python -m connectors.github_live_check \
+    github.local.json /path/to/expected/sbom.json --product prd-88 --release v5.0
+```
+
+Exit code `0` means the SHA-256 digests match, `1` means retrieval failed or
+the digests differ, and `2` means preflight failed. For a retrieval-only check,
+use `python -m connectors.try_fetch` with the same secrets and connection files.
+
+The verified live fixture is `fixtures/prd-88/v1.2/sbom.md` in
+`wood297/ECE-30861-Team-22` at commit `1bffbacd99e7a7f775b7f9073ea7ddec68e3ab1b`.
+Use that exact path in `paths` and a local copy from the same commit to
+reproduce the check with a token authorized for the repository.
+
+## Aggregation handoff for Anthony
+
+Scope each connection of type `github` to one organization and repository.
+Validate `{"repository": "owner/repository"}` with the registered connector
+at connection creation. Provision a fine-grained token with read-only Contents
+access via `SecretStore.put_connection_secret(org_id, conn_id, token)`. Keep the
+token in the secret store. For each artifact category, pin the connection ID
+alongside a `revision` containing a full lowercase commit SHA and `paths`
+containing the ordered candidate paths.
+
+Once aggregation resolves the tenant's connection and extracts the category's
+reference fields, invoke the existing connector kit:
+
+```python
+from connectors import REGISTRY, make_context
+from connectors.base import fill_ref, run_fetch
+
+connector = REGISTRY[conn.type]
+ref = fill_ref(connector.validate_ref(pin_ref), product_id, release_version)
+ctx = make_context(connector, conn, secret_store, deadline=deadline, budget=byte_budget)
+result = run_fetch(connector, conn, ref, ctx)
+```
+
+`pin_ref` contains only `revision` and `paths`. Pass the bundle's deadline
+as a monotonic timestamp and reuse its shared byte budget. On `RETRIEVED`,
+pass `result.data`, `result.filename`, and `result.version` through the existing
+artifact processing, using `connector.display_name` for the external source.
+Map other outcomes to `INACCESSIBLE` with `result.detail` as the source failure
+detail. Keep `UNAVAILABLE` results out of the cache. GitHub can return an
+ambiguous HTTP 404 for an inaccessible repository or Git object, which the
+connector reports as `AUTH_FAILED`. `NOT_FOUND` means complete Git trees
+confirmed that all candidates were absent.
+
+The current aggregation path still calls the legacy GitHub retriever in
+`artifact_pipeline.py`. The registry invocation above is the integration point
+for the shared pipeline.
