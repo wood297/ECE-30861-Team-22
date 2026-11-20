@@ -150,12 +150,14 @@ Open a PR against `person3-bounded-memory` (not `main`, for now) containing:
 
 CI runs `ruff`, `mypy`, `bandit` and `pytest`, so run them locally first.
 
-## What's not here yet
+## In the pipeline
 
-| Piece | Step | Until then |
-|---|---|---|
-| The pipeline calling connectors for a product's release, so a bundle shows your file | 2.1 | `try_fetch` and the contract tests |
-| `test_account.json`, `pod-test` and `CRA_TEST_ACCOUNT` (a full local bundle with `python app.py`) | 2.2 | As above |
+Every `POST /bundles` is served first from the **pod-test account**, `test_account.json` (loaded by `account_config.py`; `CRA_TEST_ACCOUNT` points elsewhere). A release defined there gets each category from its pinned connection through `run_fetch()`, and the bytes go through the same rules as a fixture. Releases it doesn't define keep using `fixtures/` and `source_catalog.json`.
+
+- **Your connection:** add it under `connections` with a new UUID, and pin it for a release's category under `products.<product>.releases`. A product's `rules` apply to every release, with placeholders filled in.
+- **Your token:** never in that file. Locally, `CRA_LOCAL_SECRETS=<file>` keyed by the connection id (see section 4). On the server, it's the SSM parameter `/team22-cra/orgs/<org_id>/conn/<connection id>`; send it to Person 3 privately.
+- **Offline tests:** put the exact bytes of every file you pin at `tests/fixtures/<type>/<path or filename>`. `tests/conftest.py` serves them in place of your source.
+- **Live check:** `python -m connectors.account_live_check --type <type>` fetches every pin and compares it with that copy.
 
 ## Moving a prototype onto the contract
 

@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -7,7 +8,27 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import artifact_pipeline  # noqa: E402
+from account_config import ACCOUNT_PATH, load_account  # noqa: E402
+from connectors.base import FetchResult  # noqa: E402
 from github_client import ConfirmedArtifactMissing  # noqa: E402
+
+# Committed copies of every file test_account.json pins in an external source, laid out as
+# tests/fixtures/<connector type>/<path or filename>
+OFFLINE_SOURCES = Path(__file__).parent / "fixtures"
+REAL_RUN_CONNECTOR = artifact_pipeline.run_connector
+
+
+def offline_run_connector(connector, conn, ref, **options):
+    """Stands in for Jenkins, GitHub and Confluence: a pinned file is retrieved when its committed
+    copy exists and NOT_FOUND otherwise (e.g. the -missing release). Local fixtures, and tests that
+    set CONNECTOR_HTTP_OPTIONS to a fake network, run the real connector."""
+    if connector.type == "fixtures" or artifact_pipeline.CONNECTOR_HTTP_OPTIONS is not None:
+        return REAL_RUN_CONNECTOR(connector, conn, ref, **options)
+    for name in ref.get("paths") or [ref.get("filename")]:
+        path = OFFLINE_SOURCES / connector.type / str(name)
+        if path.is_file():
+            return FetchResult.retrieved(path.read_bytes(), path.name, version="offline")
+    return FetchResult.not_found(f"{connector.display_name} has none of the pinned files (offline copy).")
 
 
 class AbsentAtCommitClient:
@@ -35,6 +56,23 @@ def offline_github():
         artifact_pipeline.clear_github_cache()
         yield
         artifact_pipeline.clear_github_cache()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def offline_connectors():
+    """The committed test_account.json, whatever CRA_TEST_ACCOUNT says, with no network."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(artifact_pipeline, "ACCOUNT", load_account(ACCOUNT_PATH))
+        patch.setattr(artifact_pipeline, "run_connector", offline_run_connector)
+        yield
+
+
+@pytest.fixture(autouse=True)
+def isolate_connectors(monkeypatch):
+    """No test reads a developer's real tokens or another test's cached fetches."""
+    monkeypatch.delenv(artifact_pipeline.LOCAL_SECRETS_ENV, raising=False)
+    monkeypatch.delenv(artifact_pipeline.SECRET_PREFIX_ENV, raising=False)
+    artifact_pipeline.clear_pinned_cache()
 
 
 @pytest.fixture(autouse=True)

@@ -5,9 +5,13 @@ knows where files came from, so another source only needs its own version of
 list_fixture_files(). Bedrock only proposes a category, for valid files with a non-standard
 name or without the proper heading. Code decides every status.
 
-source_catalog.json can point a category at one file in a GitHub repository at a pinned commit.
-That file goes through the same rules as a local one. If GitHub can't supply it, the category
-is INACCESSIBLE, matching Team 24's Phase 4 behavior.
+Where a release's files come from, first match wins:
+1. The pod-test account (test_account.json, account_config.py). Each category is pinned to one
+   file in one connection: Jenkins, GitHub, Confluence or our fixtures folder. The connectors
+   fetch the original bytes; a failed fetch makes only that category INACCESSIBLE.
+2. fixtures/<product>/<release>/, with source_catalog.json able to point a category at one file
+   in a GitHub repository at a pinned commit (the Phase 4 path).
+Either way, the bytes go through the same decide rules.
 """
 import hashlib
 import json
@@ -15,17 +19,26 @@ import logging
 import os
 import re
 import threading
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from html.parser import HTMLParser
 from pathlib import Path, PurePath
+from typing import Any, cast
 
+from account_config import AccountConfig, load_account
 from artifact_classifier import CATEGORIES, RESPONSE_SCHEMA, SYSTEM_PROMPT, LLMProvider, classify_artifact
 from artifact_formats import ValidationResult, validate_artifact
 from bedrock_adapter import BedrockProvider, BedrockProviderError
+from connectors import REGISTRY, make_context
+from connectors.base import NOT_FOUND, RETRIEVED, Connector, FetchResult, SettingsError, fill_ref, run_fetch
+from expiring_store import ExpiringStore
 from github_artifact_retrieval import EXTERNAL_SOURCE as GITHUB_SOURCE
 from github_artifact_retrieval import RetrievalResult, fetch_configured_artifact
 from github_client import GitHubClient, GitHubConfig
+from safe_http import ByteBudget
+from secret_store import LocalFileSecretStore, Secret, SecretNotFound, SecretStore, SsmSecretStore
+from tenant_store import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -361,6 +374,163 @@ def decide_github(entry: dict, category: str, product: str, release: str,
     return _decide_standard_file(SourceFile(name, data=result.original_bytes), category, provider)
 
 
+# Connector sources (the pod-test account)
+
+ACCOUNT: AccountConfig = load_account()
+# Reported as external_source for a category an account release doesn't configure
+UNCONFIGURED_SOURCE = "none"
+# All of one bundle's connector fetches share this much time and download volume
+CONNECTOR_SECONDS = 20.0
+CONNECTOR_BUDGET_BYTES = 8 * 1024 * 1024
+# A pinned reference always gives the same answer, so a found file or a confirmed absence is
+# reused for a while. Outages and credential failures are not, so the next bundle tries again.
+PINNED_CACHE_SECONDS = 600
+SECRET_PREFIX_ENV = "CRA_SECRET_PREFIX"  # nosec B105  # an environment variable's name, not a secret
+LOCAL_SECRETS_ENV = "CRA_LOCAL_SECRETS"      # a chmod 600 JSON file, on a laptop
+# Test hook: SafeHttpClient options (a fake network) for every connector request
+CONNECTOR_HTTP_OPTIONS: dict[str, Any] | None = None
+
+_pinned: ExpiringStore[tuple[str, str, str, str], FetchResult] = ExpiringStore(
+    PINNED_CACHE_SECONDS, 256, max_bytes=32 * 1024 * 1024, size_of=lambda result: 256 + len(result.data or b""))
+
+
+def clear_pinned_cache():
+    _pinned.clear()
+
+
+class _GuardedSecrets:
+    """Any secret-store failure (no AWS credentials, access denied) reads as "not stored", so a
+    broken store costs a category AUTH_FAILED instead of an error. Only the error type is logged."""
+
+    def __init__(self, store: SecretStore):
+        self._store = store
+
+    def get_connection_secret(self, org_id: str, conn_id: str) -> Secret:
+        try:
+            return self._store.get_connection_secret(org_id, conn_id)
+        except SecretNotFound:
+            raise
+        except Exception as error:
+            logger.warning("The secret store failed for a connection (%s)", type(error).__name__)
+            raise SecretNotFound("the secret store is unavailable") from None
+
+
+@lru_cache(maxsize=4)
+def _secret_store(local_file: str, prefix: str, region: str) -> SecretStore | None:
+    if local_file:
+        return LocalFileSecretStore(local_file)
+    if prefix:
+        return SsmSecretStore(prefix, region=region or None)
+    return None
+
+
+def get_secret_store() -> SecretStore | None:
+    """Where connection tokens are read from: CRA_LOCAL_SECRETS, else SSM under
+    CRA_SECRET_PREFIX, else nowhere (connections that need a token are then INACCESSIBLE)."""
+    try:
+        store = _secret_store(os.environ.get(LOCAL_SECRETS_ENV, ""), os.environ.get(SECRET_PREFIX_ENV, ""),
+                              os.environ.get("AWS_REGION", ""))
+    except Exception as error:
+        logger.warning("The secret store could not be set up (%s)", type(error).__name__)
+        return None
+    return cast(SecretStore, _GuardedSecrets(store)) if store is not None else None
+
+
+def account_sources(account: AccountConfig, product: str, release: str
+                    ) -> dict[str, tuple[Connection, dict[str, Any]]] | None:
+    """{category: (connection, concrete ref)} for a release the account defines, or None when it
+    doesn't. A release's pin wins over its product's rule for the same category."""
+    org = account.org_id
+    pinned = account.get_release(org, product, release)
+    product_rules = account.get_product(org, product)
+    if pinned is None and (product_rules is None or not product_rules.rules):
+        return None
+    entries = {**(product_rules.rules if product_rules else {}), **(pinned.pins if pinned else {})}
+    sources = {}
+    for category, entry in entries.items():
+        ref = dict(entry)
+        conn = account.get_connection(org, ref.pop("conn"))
+        if conn is not None:   # load_account already guarantees it
+            sources[category] = (conn, fill_ref(ref, product, release))
+    return sources
+
+
+def run_connector(connector: Connector, conn: Connection, ref: dict[str, Any], *, deadline: float,
+                  budget: ByteBudget, secrets: SecretStore | None) -> FetchResult:
+    """One fetch through the kit's safety net: it returns a result whatever goes wrong."""
+    ctx = make_context(connector, conn, secrets, deadline=deadline, budget=budget,
+                       http_options=CONNECTOR_HTTP_OPTIONS)
+    return run_fetch(connector, conn, ref, ctx)
+
+
+def fetch_pinned(connector: Connector, conn: Connection, ref: dict[str, Any], *, deadline: float,
+                 budget: ByteBudget, secrets: SecretStore | None) -> FetchResult:
+    """run_connector, reusing recent answers from network sources that can't change."""
+    cacheable = connector.type != "fixtures"   # local files are read fresh, like the fixtures folder
+    key = (conn.org_id, conn.conn_id, json.dumps(conn.settings, sort_keys=True), json.dumps(ref, sort_keys=True))
+    if cacheable:
+        cached = _pinned.get(key)
+        if cached is not None:
+            return cached
+    result = run_connector(connector, conn, ref, deadline=deadline, budget=budget, secrets=secrets)
+    if cacheable and result.outcome in (RETRIEVED, NOT_FOUND):
+        _pinned[key] = result
+    return result
+
+
+def _pinned_name(ref: dict[str, Any]) -> str | None:
+    """The file a failed fetch was after, for source_file."""
+    paths = ref.get("paths")
+    if isinstance(paths, list) and paths and isinstance(paths[0], str):
+        return PurePath(paths[0]).name
+    name = ref.get("filename")
+    return name if isinstance(name, str) else None
+
+
+def decide_fetched(result: FetchResult, ref: dict[str, Any], category: str,
+                   provider: LLMProvider | None) -> Decision:
+    """The decision for one connector result. A retrieved file goes through the same rules as a
+    fixture; anything else is INACCESSIBLE with the connector's one-line reason."""
+    if result.outcome != RETRIEVED or result.data is None or not result.filename:
+        return Decision("INACCESSIBLE", _pinned_name(ref), detail=result.detail)
+    name = result.filename
+    declared_format = _format_of(name)
+    # .json and .xml are only ever read as CycloneDX, which only an SBOM can be
+    if declared_format is None or (declared_format in CYCLONEDX_FORMATS and category != "SBOM"):
+        return Decision("INVALID", name, detail=f"Unsupported file format: {name}")
+    return _decide_standard_file(SourceFile(name, data=result.data), category, provider)
+
+
+def decide_from_account(sources: dict[str, tuple[Connection, dict[str, Any]]], product: str, release: str,
+                        provider: LLMProvider | None) -> tuple[dict[str, Decision], dict[str, str]]:
+    """Decisions and external_source names for a release the account defines."""
+    deadline = time.monotonic() + CONNECTOR_SECONDS
+    budget = ByteBudget(CONNECTOR_BUDGET_BYTES)
+    secrets = get_secret_store()
+    decisions: dict[str, Decision] = {}
+    names: dict[str, str] = {}
+    for category in EXPECTED_FILES:
+        if category not in sources:
+            decisions[category] = Decision("MISSING")
+            names[category] = UNCONFIGURED_SOURCE
+            continue
+        conn, ref = sources[category]
+        connector = REGISTRY[conn.type]
+        names[category] = connector.display_name
+        try:
+            # Checked again now that {product} and {release} are filled in
+            ref = connector.validate_ref(ref)
+        except SettingsError:
+            detail = f"The {connector.display_name} reference is not valid for this release."
+            decisions[category] = Decision("INACCESSIBLE", _pinned_name(ref), detail=detail)
+            continue
+        result = fetch_pinned(connector, conn, ref, deadline=deadline, budget=budget, secrets=secrets)
+        logger.info("%s %s %s: %s from %s %s", product, release, category, result.outcome,
+                    connector.display_name, result.version or "")
+        decisions[category] = decide_fetched(result, ref, category, provider)
+    return decisions, names
+
+
 def list_fixture_files(product: str, release: str) -> list[SourceFile] | None:
     """Every file directly in the release's folder, or None when the folder doesn't exist."""
     folder = FIXTURES_ROOT / product / release
@@ -388,19 +558,23 @@ def retrieve_and_classify(bundle):
         bundle["status"] = "FAILED"
         return bundle
 
-    files = list_fixture_files(product, release)
-    if files is None:
-        bundle["error"] = f"No documents found for {product} {release}"
-        bundle["status"] = "FAILED"
-        return bundle
+    account = account_sources(ACCOUNT, product, release)
+    if account is not None:
+        decisions, sources = decide_from_account(account, product, release, get_provider())
+    else:
+        files = list_fixture_files(product, release)
+        if files is None:
+            bundle["error"] = f"No documents found for {product} {release}"
+            bundle["status"] = "FAILED"
+            return bundle
 
-    provider = get_provider()
-    decisions = decide(files, provider)
-    sources = {category: SOURCE_NAME for category in decisions}
-    for category, entry in CATALOG.get(f"{product}/{release}", {}).items():
-        if entry.get("source") == "github" and category in decisions:
-            decisions[category] = decide_github(entry, category, product, release, provider)
-            sources[category] = GITHUB_SOURCE
+        provider = get_provider()
+        decisions = decide(files, provider)
+        sources = {category: SOURCE_NAME for category in decisions}
+        for category, entry in CATALOG.get(f"{product}/{release}", {}).items():
+            if entry.get("source") == "github" and category in decisions:
+                decisions[category] = decide_github(entry, category, product, release, provider)
+                sources[category] = GITHUB_SOURCE
 
     artifacts = []
     manifest = []

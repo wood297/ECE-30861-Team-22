@@ -367,7 +367,7 @@ components:
             configured external source failed or does not have the file at the pinned commit.
         external_source:
           type: string
-          description: The source queried for this artifact. `fixtures` for the local fixtures folder, `GitHub` for a file configured in `source_catalog.json`.
+          description: The source queried for this artifact. `fixtures` for the local fixtures folder, `GitHub` for a file configured in `source_catalog.json` or `test_account.json`, `Jenkins` for an artifact archived by a pinned Jenkins build, `Confluence` for a pinned page attachment version, and `none` when a release in `test_account.json` configures no source for the category (its status is then MISSING).
           example: "fixtures"
         source_failure_detail:
           type: string

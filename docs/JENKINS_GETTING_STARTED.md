@@ -1,5 +1,7 @@
 # Jenkins test data: step by step
 
+> **Partly out of date (2026-11-19).** Parts A–C (test data and Jenkins builds) are done and still correct. Parts D–E describe the v1 design (`JENKINS_*` environment variables, `/etc/cra/secrets.env`, `jenkins_live_check.py`), which the connector kit replaced. For tokens and checks, follow [PHASE5_JENKINS_PLAN_V2.md](PHASE5_JENKINS_PLAN_V2.md) §5–§6 and `python -m connectors.account_live_check`.
+
 This is the checklist for getting our **Test Logs** test data into Jenkins and connecting our service to it. It assumes no Jenkins experience. Do the parts in order. Each step says how to check it worked before you move on.
 
 - **Jenkins server:** `https://jenk-30861.jscarfo.com/` (run by Team 24)

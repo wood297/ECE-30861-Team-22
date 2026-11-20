@@ -22,7 +22,8 @@ The Phase 4 system consists of the following components:
 | Component | Function |
 |---|---|
 | Flask API | Handles documentation requests and exposes processing results |
-| GitHub Connector | Connected through `source_catalog.json`: a category can point at one file in a GitHub repository at a pinned commit. Used today only for the pod's source-failure fixture (`prd-88 v1.2-github-inaccessible`, Test Logs). Pulling real releases from `prithika-sundar/cra-artifact-test` is planned for Phase 5 |
+| Connectors | `connectors/`: Jenkins, GitHub, Confluence and the local fixtures folder, behind one contract (`CONNECTORS.md`). The pod-test account, `test_account.json`, pins each category of a release to one file in one connection: e.g. `prd-88 v1.5-jenkins` takes Test Logs from a pinned build on Team 24's Jenkins, and `v1.6-all-sources` uses all four sources. Tokens come from SSM on the server (`CRA_SECRET_PREFIX`) or a local file (`CRA_LOCAL_SECRETS`), never the repo. Check the pins live with `python -m connectors.account_live_check` |
+| GitHub Connector (Phase 4) | Connected through `source_catalog.json`: a category can point at one file in a GitHub repository at a pinned commit. Used for the pod's source-failure fixture (`prd-88 v1.2-github-inaccessible`, Test Logs) |
 | Format Validator | Validates Markdown, HTML, and CycloneDX JSON/XML |
 | Bedrock Classifier | Uses `openai.gpt-oss-20b` on AWS Bedrock to classify documents with a non-standard name or without the proper heading |
 | Bundle Generator | Creates the documentation manifest and ZIP bundle |
