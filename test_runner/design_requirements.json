@@ -1,0 +1,15 @@
+{
+  "description": "Team 22's design requirements and the suite tests that demonstrate each one, for coverage.model (Cross-team Testing Interface, Phase 5: own-team reports only). Copied from the most recent design document, the Phase 4 report Q1.1 ('Demonstrated by'). Human-readable version: docs/DESIGN_REQUIREMENTS_MAPPING.md; tests/test_model_coverage.py keeps the two in step.",
+  "design_version": "Team 22 design requirements REQ-01..REQ-08, Phase 4 report Q1.1",
+  "mapping_url": "https://github.com/wood297/ECE-30861-Team-22/blob/main/docs/DESIGN_REQUIREMENTS_MAPPING.md",
+  "requirements": [
+    {"id": "REQ-01", "title": "Release Identification", "tests": ["AC-01"]},
+    {"id": "REQ-02", "title": "Artifact Retrieval", "tests": ["AC-02", "AC-05"]},
+    {"id": "REQ-03", "title": "Documentation Category Status", "tests": ["AC-02", "AC-03", "AC-04", "AC-05", "AC-08"]},
+    {"id": "REQ-04", "title": "Release Association", "tests": ["AC-01", "AC-07"]},
+    {"id": "REQ-05", "title": "Documentation Bundle Generation", "tests": ["AC-02", "AC-05", "AC-06", "AC-07"]},
+    {"id": "REQ-06", "title": "Missing or Invalid Evidence", "tests": ["AC-03", "AC-04", "AC-05"]},
+    {"id": "REQ-07", "title": "External Source Failure", "tests": ["AC-05"]},
+    {"id": "REQ-08", "title": "Artifact Content Preservation", "tests": ["AC-05", "AC-06", "AC-07"]}
+  ]
+}

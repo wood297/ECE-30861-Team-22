@@ -1,0 +1,116 @@
+{
+  "page_id": "2457601",
+  "cases": [
+    {
+      "id": "risk_assessment_empty",
+      "filename": "risk_assessment_empty.md",
+      "version": 1,
+      "fixture": "risk_assessment_empty.md",
+      "outcome": "RETRIEVED",
+      "format": "markdown",
+      "validation": "empty_content",
+      "risk_heading": false,
+      "sha256": "743b2cb5fa591d164c63c2343e70fde734982cc2314b93fb080ef15760c639b8"
+    },
+    {
+      "id": "risk_assessment_invalid_utf8",
+      "filename": "risk_assessment_invalid_utf8.md",
+      "version": 1,
+      "fixture": "risk_assessment_invalid_utf8.md",
+      "outcome": "RETRIEVED",
+      "format": "markdown",
+      "validation": "invalid_encoding",
+      "risk_heading": false,
+      "sha256": "f6c9f5d52a6a769c8cd05da591f7804f050678bc62d08f2dc176d257b018f090"
+    },
+    {
+      "id": "risk_assessment_unsupported",
+      "filename": "risk_assessment_unsupported.txt",
+      "version": 1,
+      "fixture": "risk_assessment_unsupported.txt",
+      "outcome": "RETRIEVED",
+      "format": "text",
+      "validation": "unsupported_format",
+      "risk_heading": false,
+      "sha256": "25e888a5241b4e0427fa132764860e1099c6768730967ea0703c9b397c5f8564"
+    },
+    {
+      "id": "risk_assessment_v3.0_firmware",
+      "filename": "risk_assessment_v3.0_firmware.md",
+      "version": 1,
+      "fixture": "risk_assessment_v3.0_firmware.md",
+      "outcome": "RETRIEVED",
+      "format": "markdown",
+      "validation": "valid",
+      "risk_heading": true,
+      "sha256": "9717f4959ce30cd619e0e49c58ac552e16dc5cc868446713447abf24b65eb31e"
+    },
+    {
+      "id": "risk_assessment_v3.1_portal",
+      "filename": "risk_assessment_v3.1_portal.md",
+      "version": 1,
+      "fixture": "risk_assessment_v3.1_portal.md",
+      "outcome": "RETRIEVED",
+      "format": "markdown",
+      "validation": "valid",
+      "risk_heading": true,
+      "sha256": "25e888a5241b4e0427fa132764860e1099c6768730967ea0703c9b397c5f8564"
+    },
+    {
+      "id": "risk_assessment_v3.2_gateway",
+      "filename": "risk_assessment_v3.2_gateway.md",
+      "version": 1,
+      "fixture": "risk_assessment_v3.2_gateway.md",
+      "outcome": "RETRIEVED",
+      "format": "markdown",
+      "validation": "valid",
+      "risk_heading": true,
+      "sha256": "4f3d58b930f817793997213e9c65160b4b43daac6546cb31ac84fe91018e3335"
+    },
+    {
+      "id": "risk_assessment_valid",
+      "filename": "risk_assessment_valid.html",
+      "version": 1,
+      "fixture": "risk_assessment_valid.html",
+      "outcome": "RETRIEVED",
+      "format": "html",
+      "validation": "valid",
+      "risk_heading": true,
+      "sha256": "abe40a9ba425e3327e4673044c141e244224e5df37cab040c1e884b90b7b0e82"
+    },
+    {
+      "id": "risk_assessment_wrong_category",
+      "filename": "risk_assessment_wrong_category.md",
+      "version": 1,
+      "fixture": "risk_assessment_wrong_category.md",
+      "outcome": "RETRIEVED",
+      "format": "markdown",
+      "validation": "valid",
+      "risk_heading": false,
+      "sha256": "b8e781a2362a3e5c21af04086fdd507c3ae67776431083759959fc35a589d04c"
+    },
+    {
+      "id": "firmware-revision-two",
+      "filename": "risk_assessment_v3.0_firmware.md",
+      "version": 2,
+      "fixture": "history/risk_assessment_v3.0_firmware.md",
+      "outcome": "RETRIEVED",
+      "format": "markdown",
+      "validation": "valid",
+      "risk_heading": true,
+      "sha256": "dbc739dfdc9efb4447a5943fbde818a2603f75ef8c40717de49bb66088f2025f"
+    },
+    {
+      "id": "missing-file",
+      "filename": "absent_assessment.md",
+      "version": 1,
+      "outcome": "NOT_FOUND"
+    },
+    {
+      "id": "missing-version",
+      "filename": "risk_assessment_v3.1_portal.md",
+      "version": 999999,
+      "outcome": "NOT_FOUND"
+    }
+  ]
+}

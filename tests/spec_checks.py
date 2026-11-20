@@ -33,6 +33,9 @@ def assert_spec_report(report, planned_ids=None):
     coverage = report["coverage"]
     for kind in ("code", "component", "system"):
         assert_measure(kind, coverage[kind])
+    # Phase 5: only in reports on the tester's own team's system
+    if "model" in coverage:
+        assert_measure("model", coverage["model"])
 
 
 def assert_error_body(body, source=None):

@@ -1,0 +1,64 @@
+{
+  "description": "The pod-test account (account_config.py). Every POST /bundles is served from it first; releases not listed here keep using fixtures/ and source_catalog.json. No tokens here: a connection's token is in the secret store at <CRA_SECRET_PREFIX>/orgs/<org_id>/conn/<connection id> (SSM on the server, CRA_LOCAL_SECRETS on a laptop).",
+  "org_id": "30653a13-cd0f-418c-8ec3-a8f813be7dbc",
+  "name": "pod-test",
+  "connections": {
+    "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4": {
+      "note": "This repository's fixtures/ folder. No token.",
+      "type": "fixtures",
+      "settings": {}
+    },
+    "29b9f99b-52d3-4ef2-acbb-475d8a4f239f": {
+      "note": "Team 24's Jenkins, shared by the pod. Token: a team22 Jenkins API token.",
+      "type": "jenkins",
+      "settings": {"url": "https://jenk-30861.jscarfo.com", "user": "team22"}
+    },
+    "2d787751-e9dd-439a-ad10-e33c9257b10d": {
+      "note": "Public test repository. Token: a fine-grained, read-only token for it.",
+      "type": "github",
+      "settings": {"repository": "prithika-sundar/cra-artifact-test"}
+    },
+    "022f2e41-fa54-450c-8354-6ac0fd30f428": {
+      "note": "Confluence test page 622599. Token: a scoped API token with read:attachment:confluence. Replace the email with the account that owns the token.",
+      "type": "confluence",
+      "settings": {"cloud_id": "43c0f648-dc39-4501-a7ca-bc8bf841ad48", "email": "replace-with-token-owner@example.invalid"}
+    }
+  },
+  "products": {
+    "prd-88": {
+      "releases": {
+        "v1.5-jenkins": {
+          "SBOM": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/sbom.md"]},
+          "Risk Assessment": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/risk_assessment.md"]},
+          "User Instructions": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/user_instructions.md"]},
+          "Test Logs": {"conn": "29b9f99b-52d3-4ef2-acbb-475d8a4f239f", "job": "pod/cra-test-logs", "build": 2,
+                        "paths": ["artifacts/{product}/{release}/test_logs.md"]}
+        },
+        "v1.5-jenkins-missing": {
+          "SBOM": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/sbom.md"]},
+          "Risk Assessment": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/risk_assessment.md"]},
+          "User Instructions": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/user_instructions.md"]},
+          "Test Logs": {"conn": "29b9f99b-52d3-4ef2-acbb-475d8a4f239f", "job": "pod/cra-test-logs", "build": 3,
+                        "paths": ["artifacts/{product}/{release}/test_logs.md"]}
+        },
+        "v1.5-jenkins-empty": {
+          "SBOM": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/sbom.md"]},
+          "Risk Assessment": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/risk_assessment.md"]},
+          "User Instructions": {"conn": "b7b336c4-e3b2-4cf9-83a0-8e6ad90550e4", "paths": ["prd-88/v1.2/user_instructions.md"]},
+          "Test Logs": {"conn": "29b9f99b-52d3-4ef2-acbb-475d8a4f239f", "job": "pod/cra-test-logs", "build": 4,
+                        "paths": ["artifacts/{product}/{release}/test_logs.md"]}
+        },
+        "v1.6-all-sources": {
+          "SBOM": {"conn": "2d787751-e9dd-439a-ad10-e33c9257b10d", "revision": "f6d381dc6ddb716e1603230a85ea300de462d252",
+                   "paths": ["artifacts/test-product/v1.0/sbom.json"]},
+          "User Instructions": {"conn": "2d787751-e9dd-439a-ad10-e33c9257b10d", "revision": "f6d381dc6ddb716e1603230a85ea300de462d252",
+                                "paths": ["artifacts/test-product/v1.0/user_instructions.md"]},
+          "Risk Assessment": {"conn": "022f2e41-fa54-450c-8354-6ac0fd30f428", "page_id": "622599",
+                              "filename": "risk_assessment.md", "version": 1},
+          "Test Logs": {"conn": "29b9f99b-52d3-4ef2-acbb-475d8a4f239f", "job": "pod/cra-test-logs", "build": 2,
+                        "paths": ["artifacts/prd-88/v1.5-jenkins/test_logs.md"]}
+        }
+      }
+    }
+  }
+}

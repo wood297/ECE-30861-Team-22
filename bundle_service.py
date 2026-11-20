@@ -31,6 +31,24 @@ def final_status(manifest):
     return "PARTIAL_SUCCESS"
 
 
+MANIFEST_NAME = "manifest.json"
+
+
+def archive_names(artifacts):
+    """The path of each artifact in the zip: its source file name, or <category>/<name> when that
+    name is taken by an earlier artifact or by manifest.json. Files from different sources (two
+    connectors, say) can share a name, and a zip must not hold two entries with one name."""
+    used = {MANIFEST_NAME}
+    names = []
+    for artifact in artifacts:
+        name = artifact["source_file"]
+        if name in used:
+            name = f"{artifact['category'].lower().replace(' ', '-')}/{name}"
+        used.add(name)
+        names.append(name)
+    return names
+
+
 def build_archive(bundle):
     """Zip of the collected artifacts under their source file names, plus manifest.json (REQ-05).
 
@@ -39,10 +57,10 @@ def build_archive(bundle):
     """
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for artifact in bundle["artifacts"]:
-            _add(archive, artifact["source_file"], artifact["content"].encode("utf-8"))
+        for artifact, name in zip(bundle["artifacts"], archive_names(bundle["artifacts"])):
+            _add(archive, name, artifact["content"].encode("utf-8"))
         manifest = {key: bundle[key] for key in ("product_id", "release_version", "status", "manifest")}
-        _add(archive, "manifest.json", json.dumps(manifest, indent=2).encode("utf-8") + b"\n")
+        _add(archive, MANIFEST_NAME, json.dumps(manifest, indent=2).encode("utf-8") + b"\n")
     return buffer.getvalue()
 
 

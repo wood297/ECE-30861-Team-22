@@ -25,11 +25,18 @@ def report():
     session_id = f"acceptance-{uuid.uuid4()}"
     setup_target(client, session_id)
     # Processing is synchronous here, so there is nothing to wait for
-    return run_suite(client, session_id=session_id, target="in-process", poll_timeout=0, poll_interval=0)
+    return run_suite(client, session_id=session_id, target="in-process", poll_timeout=0, poll_interval=0,
+                     own_system=True)
 
 
 def test_report_is_well_formed(report):
     assert_spec_report(report, [c.id for c in CRITERIA])
+
+
+def test_our_suite_evaluates_every_design_requirement(report):
+    # coverage.model, which the tester reports when it tests our own system (Phase 5)
+    model = report["coverage"]["model"]
+    assert (model["covered"], model["total"]) == (8, 8), model["basis"]
 
 
 @pytest.mark.parametrize("criterion_id", [c.id for c in CRITERIA])

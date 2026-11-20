@@ -17,18 +17,27 @@ component and system coverage.
 import hashlib
 import io
 import json
+import os
 import time
 import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from test_runner.session import NETWORK_ERRORS
 
 PACKAGE_DIR = Path(__file__).parent
 DEFAULT_ORACLE = PACKAGE_DIR / "oracle.json"
 DEFAULT_FIXTURES = PACKAGE_DIR.parent / "fixtures"
+DESIGN_REQUIREMENTS = PACKAGE_DIR / "design_requirements.json"
+
+# coverage.model goes only in reports on our own system (Cross-team Testing Interface, Phase 5).
+# Our deployed system, plus any base URLs listed (comma-separated) in CRA_OWN_SYSTEM_URLS. A
+# system on this machine (localhost) is ours too: that's how we run it during development.
+OWN_SYSTEM_URLS = ("https://team22.13-58-35-224.sslip.io/system",)
+OWN_SYSTEM_ENV = "CRA_OWN_SYSTEM_URLS"
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 TERMINAL_STATUSES = {"COMPLETED", "PARTIAL_SUCCESS", "FAILED"}
 BUNDLE_STATUSES = {"PENDING", "PROCESSING"} | TERMINAL_STATUSES
@@ -658,13 +667,61 @@ def compute_coverage(oracle, results, code):
     return {"code": code, "component": component, "system": system}
 
 
+def _url_key(url):
+    """(scheme, host, port, path) for comparing base URLs, or None for anything that isn't one."""
+    try:
+        parts = urlsplit(str(url).strip())
+        port = parts.port or {"http": 80, "https": 443}.get(parts.scheme.lower())
+    except ValueError:
+        return None
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+        return None
+    return parts.scheme.lower(), parts.hostname.lower(), port, parts.path.rstrip("/")
+
+
+def is_own_system(target):
+    """Whether target is Team 22's system, so the report gets coverage.model."""
+    key = _url_key(target)
+    if key is None:
+        return False
+    if key[1] in _LOOPBACK_HOSTS:
+        return True
+    listed = [*OWN_SYSTEM_URLS, *os.environ.get(OWN_SYSTEM_ENV, "").split(",")]
+    return any(key == _url_key(url) for url in listed if url.strip())
+
+
+def compute_model_coverage(results, design_path=DESIGN_REQUIREMENTS):
+    """coverage.model: how many of our design requirements the suite evaluated. A requirement is
+    evaluated when at least one test the design maps to it ran (pass or fail); like the other
+    measures, it records what was exercised, not whether it behaved correctly."""
+    try:
+        design = json.loads(Path(design_path).read_text(encoding="utf-8"))
+        version, url = design["design_version"], design["mapping_url"]
+        requirements = [(r["id"], set(r["tests"])) for r in design["requirements"]]
+        if not requirements:
+            raise ValueError("no requirements listed")
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return _measure(None, None, f"Design requirements unavailable: the tester could not load "
+                                    f"{Path(design_path).name} ({type(exc).__name__})")
+    executed = {r["test_id"] for r in results if r["outcome"] in ("pass", "fail")}
+    missed = [req for req, tests in requirements if not tests & executed]
+    gaps = f"not evaluated: {', '.join(missed)}" if missed else "all evaluated"
+    return _measure(len(requirements) - len(missed), len(requirements),
+                    f"{version}; a requirement counts as evaluated when at least one test mapped to it ran "
+                    f"(pass or fail); {gaps}. Mapping: {url}")
+
+
 def run_suite(client, session_id=None, target=None, oracle_path=DEFAULT_ORACLE, fixtures_root=DEFAULT_FIXTURES,
-              poll_timeout=5.0, poll_interval=0.25, only=None, time_budget=RUN_BUDGET):
+              poll_timeout=5.0, poll_interval=0.25, only=None, time_budget=RUN_BUDGET, own_system=None,
+              design_path=DESIGN_REQUIREMENTS):
     """Run every criterion (or those whose id is in `only`) and return the suite report.
 
     Never raises for target problems: those become error results. If the tester itself
     cannot continue, the report has "aborted": true, the interrupted test is an error
     with source "tester" and every later test is a skip.
+
+    coverage.model is included only for our own system: own_system, or when it's None,
+    is_own_system(target).
     """
     started = datetime.now(timezone.utc)
     t_start = time.monotonic()
@@ -716,13 +773,16 @@ def run_suite(client, session_id=None, target=None, oracle_path=DEFAULT_ORACLE, 
                                round((time.monotonic() - t0) * 1000, 1)))
 
     code = fetch_code_coverage(client, session_id)
+    coverage = compute_coverage(oracle, results, code)
+    if is_own_system(target) if own_system is None else own_system:
+        coverage["model"] = compute_model_coverage(results, design_path)
     summary = {key: sum(r["outcome"] == key for r in results) for key in OUTCOMES}
     summary["total"] = len(results)
     report = {
         "session_id": session_id,
         "target_url": target,
         "results": results,
-        "coverage": compute_coverage(oracle, results, code),
+        "coverage": coverage,
         "summary": summary,
         "passed": summary["fail"] == 0 and summary["error"] == 0 and abort_message is None,
         "spec_version": oracle.get("spec_version"),
@@ -736,18 +796,19 @@ def run_suite(client, session_id=None, target=None, oracle_path=DEFAULT_ORACLE, 
     return report
 
 
-def aborted_report(session_id, target, message, only=None):
+def aborted_report(session_id, target, message, only=None, own_system=None):
     """Report for a run that crashed before run_suite could return: every planned test is a skip."""
     planned = [c for c in CRITERIA if not only or c.id in only]
     results = [_result(c, "skip", f"Not executed: the tester aborted. {message}") for c in planned]
     unavailable = "unavailable: the tester aborted before measuring"
+    measures = [("code", "Source lines"), ("component", "Pod components"), ("system", "Pod acceptance criteria")]
+    if is_own_system(target) if own_system is None else own_system:
+        measures.append(("model", "Team 22 design requirements"))
     return {
         "session_id": session_id,
         "target_url": target,
         "results": results,
-        "coverage": {key: _measure(None, None, f"{basis}; {unavailable}") for key, basis in
-                     (("code", "Source lines"), ("component", "Pod components"),
-                      ("system", "Pod acceptance criteria"))},
+        "coverage": {key: _measure(None, None, f"{basis}; {unavailable}") for key, basis in measures},
         "summary": {**{key: 0 for key in OUTCOMES}, "skip": len(results), "total": len(results)},
         "passed": False,
         "aborted": True,
