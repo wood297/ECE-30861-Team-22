@@ -351,3 +351,23 @@ def test_the_live_check_needs_a_secret_store(capsys):
     from connectors import account_live_check
     assert account_live_check.main([]) == 2
     assert "CRA_LOCAL_SECRETS" in capsys.readouterr().out
+
+
+# The tester's expected bytes for the Jenkins releases (fixtures/prd-88/v1.5-jenkins*/). Our own
+# system never serves these copies (test_account.json wins); they must equal the real sources.
+
+@pytest.mark.parametrize("release", ["v1.5-jenkins", "v1.5-jenkins-missing", "v1.5-jenkins-empty"])
+def test_the_testers_expected_bytes_match_the_real_sources(release):
+    folder = REPO / "fixtures/prd-88" / release
+    for name in ("sbom.md", "risk_assessment.md", "user_instructions.md"):
+        assert (folder / name).read_bytes() == (REPO / "fixtures/prd-88/v1.2" / name).read_bytes(), name
+    jenkins_copy = OFFLINE / "jenkins/artifacts/prd-88" / release / "test_logs.md"
+    assert (folder / "test_logs.md").is_file() == jenkins_copy.is_file()
+    if jenkins_copy.is_file():
+        assert (folder / "test_logs.md").read_bytes() == jenkins_copy.read_bytes()
+
+
+def test_account_releases_are_served_from_their_sources_not_the_testers_copies():
+    _, items, _ = bundle_for("prd-88", "v1.5-jenkins")
+    assert items["Test Logs"]["external_source"] == "Jenkins"
+    assert {items[c]["external_source"] for c in ("SBOM", "Risk Assessment", "User Instructions")} == {"fixtures"}

@@ -35,13 +35,18 @@ def test_the_spec_table_lists_every_shared_release_with_its_expected_statuses():
     assert rows["v1.5-jenkins"].sha256 == {
         "test_logs.md": "f5cf3fd835fdbbe957222dcc18a4fa12d3d192936e20a7eeee7cea22b1658173"}
     assert rows["v0.0-does-not-exist"].bundle == "FAILED"
+    assert rows["v1.5-jenkins-empty"].sources == {"Test Logs": "Jenkins"}
+    assert rows["v1.2-github-inaccessible"].sources == {"Test Logs": "GitHub"}
+    assert rows["v1.2"].sources == {}
 
 
 def test_it_catches_a_release_the_system_does_not_serve(monkeypatch):
     monkeypatch.setattr(artifact_pipeline, "ACCOUNT", EMPTY_ACCOUNT)
+    # Without the account, the Jenkins releases would come from the tester's local copies in
+    # fixtures/: still "COMPLETED", but not from Jenkins, which the spec's table requires
     failed = failures(run_checks())
-    assert "got FAILED" in failed["prd-88 v1.5-jenkins: bundle COMPLETED"]
-    assert "v1.5-jenkins" in failed["POST /test/setup lists every shared release"]
+    assert "'fixtures'" in failed["prd-88 v1.5-jenkins: Test Logs comes from Jenkins"]
+    assert "MISSING" in failed["prd-88 v1.5-jenkins-missing: categories as documented"]
 
 
 def test_it_catches_a_response_that_breaks_its_schema(monkeypatch):

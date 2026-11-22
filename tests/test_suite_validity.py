@@ -46,6 +46,9 @@ def test_reference_system_passes_every_criterion(variant):
     ("hide_source_failure", "AC-05"),
     ("silent_source_failure", "AC-05"),
     ("drop_on_source_failure", "AC-05"),
+    ("ignore_external_source", "AC-02"),
+    ("ignore_external_source", "AC-04"),
+    ("ignore_external_source", "AC-05"),
 ])
 def test_suite_detects_defect(defect, criterion_id):
     assert outcomes(defect)[criterion_id] == "fail"
