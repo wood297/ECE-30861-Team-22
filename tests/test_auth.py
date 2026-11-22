@@ -179,7 +179,7 @@ def test_signup_goes_to_cognitos_sign_up_page(accounts):
     assert urlsplit(response.headers["Location"]).path == "/signup"
 
 
-def test_a_full_sign_in_starts_a_session_holding_only_sub_org_and_expiry(accounts):
+def test_a_full_sign_in_starts_a_session_holding_only_sub_org_expiry_and_email(accounts):
     c = client()
     response = sign_in(c, accounts)
     assert response.headers["Location"].endswith("/app/")
@@ -188,10 +188,11 @@ def test_a_full_sign_in_starts_a_session_holding_only_sub_org_and_expiry(account
     assert data["sub"] == SUB
     assert data["org_id"] is None
     assert data["exp"] == pytest.approx(accounts.clock() + 8 * 3600, abs=2)
-    assert set(data) <= {"sub", "org_id", "exp", "_permanent"}
+    assert data["email"] == "person@example.test"
+    assert set(data) <= {"sub", "org_id", "exp", "email", "_permanent"}
     home = c.get("/app/", base_url=BASE)
     assert home.status_code == 200
-    assert b"signed in" in home.data
+    assert b"Your organizations" in home.data
     assert b"Sign out" in home.data
 
 
@@ -209,9 +210,21 @@ def test_no_cognito_token_is_kept_in_the_session(accounts):
     sign_in(c, accounts)
     cookie = c.get_cookie("cra_session", domain="team22.example.test").value
     decoded = json.dumps(app.session_interface.get_signing_serializer(app).loads(cookie))
-    assert set(json.loads(decoded)) <= {"sub", "org_id", "exp", "_permanent"}
+    assert set(json.loads(decoded)) <= {"sub", "org_id", "exp", "email", "_permanent"}
     assert "eyJ" not in decoded  # no JWT
-    assert "person@example.test" not in decoded
+
+
+@pytest.mark.parametrize("verified", [False, "false", None])
+def test_an_unverified_email_isnt_kept(accounts, verified):
+    c = client()
+    _, params = start_login(c, accounts)
+    extra = {} if verified is None else {"email_verified": verified}
+    token = make_token("id", nonce=params["nonce"], **extra)
+    if verified is None:
+        token = make_token("id", nonce=params["nonce"], drop=("email_verified",))
+    accounts.cognito.id_token = token
+    assert c.get(f"/auth/callback?code=abc&state={params['state']}", base_url=BASE).status_code == 302
+    assert "email" not in session_data(c)
 
 
 @pytest.mark.parametrize("query", ["code=abc&state=wrong", "code=abc", "state={state}", "error=access_denied"])
@@ -536,7 +549,8 @@ def write_secrets(tmp_path, app_secrets):
     return str(path)
 
 
-ENV = {"CRA_COGNITO_POOL_ID": POOL, "CRA_COGNITO_CLIENT_ID": CLIENT, "CRA_COGNITO_DOMAIN": DOMAIN}
+ENV = {"CRA_COGNITO_POOL_ID": POOL, "CRA_COGNITO_CLIENT_ID": CLIENT, "CRA_COGNITO_DOMAIN": DOMAIN,
+       "CRA_TENANT_TABLE": "team22-cra-tenants-test"}
 
 
 def test_accounts_are_off_without_cognito_settings():
@@ -550,6 +564,7 @@ def test_accounts_turn_on_with_settings_and_secrets(tmp_path):
     state, secret_key = loaded
     assert secret_key == "k" * 40
     assert state.config == CONFIG
+    assert state.accounts.store.table == "team22-cra-tenants-test"
 
 
 @pytest.mark.parametrize("env", [
@@ -557,7 +572,8 @@ def test_accounts_turn_on_with_settings_and_secrets(tmp_path):
     {**ENV, "CRA_COGNITO_POOL_ID": "not a pool"},
     {**ENV, "CRA_COGNITO_DOMAIN": "evil.example.test"},
     ENV,  # no secret store
-], ids=["partial", "bad-pool", "bad-domain", "no-secrets"])
+    {k: v for k, v in ENV.items() if k != "CRA_TENANT_TABLE"},
+], ids=["partial", "bad-pool", "bad-domain", "no-secrets", "no-table"])
 def test_bad_settings_turn_accounts_off_instead_of_crashing(env):
     assert auth.load_from_env(env) is None
 

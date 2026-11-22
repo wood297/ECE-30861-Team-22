@@ -7,8 +7,9 @@ Browsers sign in through Cognito's managed login pages with the authorization-co
     GET  /auth/callback  <- Cognito sends the person back; we exchange the code and check the ID token
     POST /auth/logout    -> clears our session, then Cognito's
 
-After the ID token checks out, the session cookie holds only `sub`, the active `org_id` and an
-expiry (8 hours). No Cognito token is kept. API callers send a Cognito access token as
+After the ID token checks out, the session cookie holds only `sub`, the active `org_id`, an
+expiry (8 hours) and, if Cognito has verified it, the person's email, which is what invites are
+matched against (step 5.2). No Cognito token is kept. API callers send a Cognito access token as
 `Authorization: Bearer <token>` instead.
 
 Who a request is (`g.identity`):
@@ -23,9 +24,9 @@ their own shared token to every system (docs/phase-4-cross-team-testing.md, item
 keep answering them as before; such a token can't be a customer's login, so ignoring it can't hand
 a customer test data.
 
-Without the Cognito settings (CRA_COGNITO_POOL_ID, CRA_COGNITO_CLIENT_ID, CRA_COGNITO_DOMAIN) or
-the app secrets, accounts are off: /auth/* and /app/* answer 503 and every request is the tester,
-as today. That's how local runs and CI work.
+Without the Cognito settings (CRA_COGNITO_POOL_ID, CRA_COGNITO_CLIENT_ID, CRA_COGNITO_DOMAIN), the
+tenant table (CRA_TENANT_TABLE) or the app secrets, accounts are off: /auth/* and /app/* answer 503
+and every request is the tester, as today. That's how local runs and CI work.
 """
 import base64
 import hashlib
@@ -37,18 +38,21 @@ import re
 import secrets
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 
 import jwt
 from flask import Blueprint, Flask, current_app, g, jsonify, redirect, render_template, request, session, url_for
+
+from accounts import Accounts, CognitoDirectory, NoDirectory, UserDirectory
 from flask.sessions import SecureCookieSessionInterface
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from safe_http import SafeHttpClient, SafeHttpError
 from secret_store import LocalFileSecretStore, SecretStore, SecretStoreError, SsmSecretStore
+from tenant_store import DynamoTenantStore, InMemoryTenantStore
 
 log = logging.getLogger(__name__)
 
@@ -242,6 +246,8 @@ class AuthState:
     verifier: TokenVerifier
     cognito: CognitoClient
     clock: Callable[[], float] = time.time
+    accounts: Accounts = field(default_factory=lambda: Accounts(InMemoryTenantStore()))
+    directory: UserDirectory = field(default_factory=NoDirectory)
 
 
 @dataclass(frozen=True)
@@ -280,6 +286,10 @@ def load_from_env(env: Mapping[str, str] = os.environ) -> tuple[AuthState, str] 
         return None
     if config is None:
         return None
+    table = env.get("CRA_TENANT_TABLE", "").strip()
+    if not table:
+        log.error("accounts are off: CRA_TENANT_TABLE is not set")
+        return None
     try:
         store: SecretStore
         if env.get("CRA_LOCAL_SECRETS"):
@@ -297,7 +307,13 @@ def load_from_env(env: Mapping[str, str] = os.environ) -> tuple[AuthState, str] 
     except Exception as error:  # boto3 raises botocore errors for missing credentials and the like
         log.error("accounts are off: couldn't read the app secrets (%s)", type(error).__name__)
         return None
-    return AuthState(config, TokenVerifier(config), CognitoClient(config, client_secret)), secret_key
+    try:
+        accounts = Accounts(DynamoTenantStore(table, region=config.region))
+    except Exception as error:
+        log.error("accounts are off: couldn't open the tenant table (%s)", type(error).__name__)
+        return None
+    return AuthState(config, TokenVerifier(config), CognitoClient(config, client_secret),
+                     accounts=accounts, directory=CognitoDirectory(config.pool_id, config.region)), secret_key
 
 
 csrf = CSRFProtect()
@@ -308,8 +324,12 @@ def _state() -> AuthState | None:
     return current_app.extensions.get("cra_auth")
 
 
+# Blueprints whose pages are HTML for people, not JSON for programs
+PAGE_BLUEPRINTS = {"auth", "account"}
+
+
 def _wants_html() -> bool:
-    return request.blueprint == "auth"
+    return request.blueprint in PAGE_BLUEPRINTS
 
 
 def _unauthorized(reason: str, bearer: bool = False):
@@ -326,7 +346,7 @@ def _unauthorized(reason: str, bearer: bool = False):
     return response
 
 
-def _message(status: int, title: str, message: str, sign_in: bool = False):
+def message_page(status: int, title: str, message: str, sign_in: bool = False):
     return render_template("account/message.html", title=title, message=message, sign_in=sign_in), status
 
 
@@ -368,7 +388,7 @@ def resolve_identity():
 @bp.before_request
 def _accounts_on():
     if _state() is None:
-        return _message(503, "Accounts aren't available", "Accounts aren't set up on this server.")
+        return message_page(503, "Accounts aren't available", "Accounts aren't set up on this server.")
     if request.method == "POST":
         csrf.protect()
     return None
@@ -409,28 +429,30 @@ def callback():
     assert state is not None  # nosec B101
     pending = session.pop("login", None)
     if not isinstance(pending, dict) or state.clock() - pending.get("started", 0) > LOGIN_WINDOW_SECONDS:
-        return _message(400, "Sign-in expired", "That sign-in took too long or was already used. "
+        return message_page(400, "Sign-in expired", "That sign-in took too long or was already used. "
                                                 "Please start again.", sign_in=True)
     if request.args.get("error"):
         # Cancelled or refused on Cognito's side. The value isn't shown: it comes from the URL
-        return _message(400, "Sign-in didn't finish", "Sign-in was cancelled or refused.", sign_in=True)
+        return message_page(400, "Sign-in didn't finish", "Sign-in was cancelled or refused.", sign_in=True)
     returned_state, code = request.args.get("state", ""), request.args.get("code", "")
     if not returned_state or not hmac.compare_digest(returned_state, pending.get("state", "")) or not code:
-        return _message(400, "Sign-in didn't finish", "That sign-in link isn't valid for this browser. "
+        return message_page(400, "Sign-in didn't finish", "That sign-in link isn't valid for this browser. "
                                                       "Please start again.", sign_in=True)
     try:
         id_token = state.cognito.exchange_code(code, url_for("auth.callback", _external=True), pending["verifier"])
         claims = state.verifier.verify_id_token(id_token, pending["nonce"])
     except TokenError as error:
         log.warning("sign-in failed: %s", error)
-        return _message(502, "Sign-in didn't finish", "We couldn't confirm your sign-in with Cognito. "
+        return message_page(502, "Sign-in didn't finish", "We couldn't confirm your sign-in with Cognito. "
                                                       "Please try again.", sign_in=True)
     session.clear()
     session.permanent = True
     session["sub"] = claims["sub"]
     session["org_id"] = None
     session["exp"] = int(state.clock()) + SESSION_HOURS * 3600
-    return redirect(url_for("auth.home"))
+    if claims.get("email_verified") in (True, "true") and isinstance(claims.get("email"), str):
+        session["email"] = claims["email"].strip().lower()
+    return redirect(url_for("account.home"))
 
 
 @bp.route("/auth/logout", methods=["POST"])
@@ -440,14 +462,6 @@ def logout():
     session.clear()
     query = urlencode({"client_id": state.config.client_id, "logout_uri": url_for("index", _external=True)})
     return redirect(f"https://{state.config.domain}/logout?{query}")
-
-
-@bp.route("/app/", methods=["GET"])
-def home():
-    identity: Identity = g.identity
-    if identity.is_tester or identity.via != "session":
-        return redirect(url_for("auth.login"))
-    return render_template("account/home.html", title="You're signed in")
 
 
 def _security_headers(response):
@@ -461,7 +475,7 @@ def _security_headers(response):
     headers.setdefault("Content-Security-Policy",
                        "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
                        f"form-action {form_targets}; frame-ancestors 'none'; base-uri 'none'")
-    if request.blueprint == "auth":
+    if request.blueprint in PAGE_BLUEPRINTS:
         headers["Cache-Control"] = "no-store"
     return response
 
@@ -488,9 +502,11 @@ def init_app(app: Flask, loaded: tuple[AuthState, str] | None) -> None:
         app.extensions["cra_auth"] = state
     csrf.init_app(app)
     app.register_blueprint(bp)
+    from account_pages import bp as account_bp
+    app.register_blueprint(account_bp)
     app.before_request(resolve_identity)
     app.after_request(_security_headers)
 
     @app.errorhandler(CSRFError)
     def _csrf_failed(error):
-        return _message(400, "Form expired", "That form has expired. Go back, reload the page and try again.")
+        return message_page(400, "Form expired", "That form has expired. Go back, reload the page and try again.")
