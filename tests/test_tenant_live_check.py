@@ -8,7 +8,7 @@ import pytest
 
 import auth
 import tenant_live_check
-from tests.test_tenant_store import aws_env  # noqa: F401  # a fixture
+from test_tenant_store import aws_env  # noqa: F401  # a fixture (same import path as the other tests, for mypy)
 
 TABLE, PREFIX = "team22-cra-tenants-dev", "/team22-cra-dev"
 POOL = "us-east-2_LiveCheck"

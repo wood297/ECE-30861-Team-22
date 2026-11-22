@@ -7,7 +7,7 @@
 - **Nothing you rely on has changed.** Our bundle API is the same as in Phase 4, and every Phase 4 shared release returns exactly what it did in our 2026-11-01 runs (15/15 and 14/14 both ways). That includes `v1.2-github-inaccessible` for AC-05.
 - **Your Phase 4 tester and expected results should pass against our Phase 5 system unchanged.** We'll run ours against yours the same way.
 - **We set up a small amount of test data on your Jenkins** (§2). Please leave it in place.
-- **Shared Jenkins test cases are optional** (§4). If you've built a Jenkins connector and want AC-05 or AC-06 checked with a real Jenkins source, the data is ready for both teams. If not, skip it.
+- **We propose one spec change (our `spec.yaml` 1.4.0):** three shared releases whose Test Logs come from the pinned Jenkins builds, used for AC-04, AC-05 and AC-06 (§4). It adds to the shared suite and removes nothing. **We need your agreement before either tester checks them.**
 
 ## 2. What we did on your Jenkins server
 
@@ -37,11 +37,11 @@ How our deployed system uses it:
 
 Our system now gets documents through **connectors**: Jenkins (a pinned build's archived artifact), GitHub (a file at a pinned commit), Confluence (a pinned page attachment version) and our local files. Each category of a release is pinned to one file in one source. If a source fails, only that category is INACCESSIBLE, and the bundle is still PARTIAL_SUCCESS with the other files.
 
-The only visible API change: `external_source` in the manifest can now be `fixtures`, `GitHub`, `Jenkins`, `Confluence`, or `none` (no source configured for the category, reported as MISSING). Neither team's tester checks this field.
+The only visible API change: `external_source` in the manifest can now be `fixtures`, `GitHub`, `Jenkins`, `Confluence`, or `none` (no source configured for the category, reported as MISSING). Our tester doesn't check this field. If your AC-05 checks that the failed source is named: a failed Jenkins source shows `external_source: "Jenkins"`, and `source_failure_detail` names the job and build.
 
-## 4. Optional: shared Jenkins test cases
+## 4. Proposed spec change (1.4.0): shared Jenkins test cases
 
-Only if you want them. Both systems would serve these three releases identically (product `prd-88`). Test Logs come from the builds in §2; the other three categories are byte-identical copies of your existing `v1.2` files.
+Both systems serve these three releases identically (product `prd-88`), and both testers check them in addition to the Phase 4 releases. Pinned builds return the same bytes on every run, so they're as repeatable as fixtures; Phase 2's Risk 1 left this decision to the pod. Test Logs come from the builds in §2; the other three categories are byte-identical copies of your existing `v1.2` files.
 
 | Release | Test Logs from | Test Logs status | Other three | Bundle |
 |---|---|---|---|---|
@@ -55,7 +55,7 @@ The rules are the ones we already share from Phase 4:
 - bytes are returned unchanged
 - use the pinned build number, never `lastSuccessfulBuild`
 
-Our system already serves these. If you want them, tell us, and both teams add them to their testers' expected results before the test window.
+Our system already serves these. Once you agree, both teams add them to their testers' expected results, and we record the date and channel of the agreement in our Phase 5 report (Q3.2).
 
 ## 5. Running cross-team testing
 
@@ -72,5 +72,5 @@ The same as Phase 4 (calls in our Phase 4 doc §3–§4):
 
 1. **Your registry details**, if anything changed since Phase 4: system URL, tester URL, token, and which tester profile we should run (Phase 4: `team24`).
 2. **A test window.** We'll pause our automatic deploys during it; please keep Jenkins up.
-3. **Yes or no on the optional Jenkins cases in §4.**
+3. **Agreement on the spec change in §4**, or what you'd change. Also: will your system read builds 2–4 before the window?
 4. **Only if our server gets a Cloudflare 403** (we'll tell you): a skip rule for `13.58.35.224` on `jenk-30861.jscarfo.com`. Steps are in `TEAM24_CLOUDFLARE_ALLOWLIST.md`.

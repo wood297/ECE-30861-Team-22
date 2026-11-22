@@ -78,10 +78,13 @@ def no_rate_limits():
 
 @pytest.fixture(autouse=True)
 def isolate_connectors(monkeypatch):
-    """No test reads a developer's real tokens or another test's cached fetches."""
+    """No test reads a developer's real tokens or another test's cached fetches, from the
+    connectors or from the Phase 4 GitHub catalog (a fake GitHub that served a file must not
+    leave it cached for v1.2-github-inaccessible)."""
     monkeypatch.delenv(artifact_pipeline.LOCAL_SECRETS_ENV, raising=False)
     monkeypatch.delenv(artifact_pipeline.SECRET_PREFIX_ENV, raising=False)
     artifact_pipeline.clear_pinned_cache()
+    artifact_pipeline.clear_github_cache()
 
 
 @pytest.fixture(autouse=True)

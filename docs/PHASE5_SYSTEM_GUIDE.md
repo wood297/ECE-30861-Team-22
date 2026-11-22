@@ -319,6 +319,7 @@ Tokens never appear in manifests, logs or error details: the connector kit masks
 | One live fetch | `CRA_LOCAL_SECRETS=<file> python -m connectors.try_fetch <connection.json> --product prd-88 --release v1.5-jenkins` |
 | **Check every pinned file against its committed copy (run before every test window)** | `CRA_LOCAL_SECRETS=<file> python -m connectors.account_live_check --type jenkins`, which prints one JSON line per pin and exits 0 if all match |
 | The same on EC2 | `CRA_SECRET_PREFIX=/team22-cra python -m connectors.account_live_check` |
+| **Check a deployed system against `spec.yaml`** (every operation's responses against the schemas, and every shared release's statuses and bytes) | `python -m test_runner.spec_check --url https://team22.13-58-35-224.sslip.io/system`. Exits 0 only if every check passes |
 | A full local bundle against the real Jenkins | `CRA_LOCAL_SECRETS=<file> python app.py`, then `POST /bundles` |
 
 **Verified 2026-11-19 from a laptop, against the real Jenkins:** all four Jenkins pins match their sha256. Real bundles for the three `v1.5-jenkins*` releases came out COMPLETED, PARTIAL_SUCCESS (INACCESSIBLE) and PARTIAL_SUCCESS (INVALID).
@@ -357,7 +358,7 @@ flowchart LR
 
 **For cross-team testing, nothing.** Each team builds its own system however it likes; the testers only compare answers for the shared releases. The Phase 4 shared releases (`v1.2`, `v1.3`, `v1.4`, `v2.0`, `v1.2-github-inaccessible` for AC-05, `v0.0-does-not-exist`) are unchanged on our side and passed both ways on 2026-11-01. The one new spec item is `coverage.model`, which our tester now adds only for our own system (`docs/DESIGN_REQUIREMENTS_MAPPING.md`).
 
-The three Jenkins releases (`v1.5-jenkins`, `-missing`, `-empty`) are **optional** shared cases, offered to Team 24 in their doc §4. If both teams want them, add them to both testers' expected results; otherwise they're our own showcase.
+**Proposed spec change (`spec.yaml` 1.4.0):** the three Jenkins releases (`v1.5-jenkins`, `-missing`, `-empty`) become shared cases for AC-06, AC-05 and AC-04 (Team 24 doc §4). Once Team 24 agrees, both testers add them, and the date and channel of the agreement go in the Phase 5 report, Q3.2.
 
 ### 9.3 Our to-do list before a test window
 

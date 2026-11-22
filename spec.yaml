@@ -60,28 +60,31 @@ info:
         fields and status values. Two descriptions that still said processing was synchronous
         are corrected (it has been in the background since 1.3.0). Duplicate file names in the
         archive are now placed under a folder named for their category.
+      - Optional company accounts (Team 22 only; not a pod operation). **A request with no
+        credentials works exactly as before** and is served the shared test data. A signed-in
+        company sends a Cognito access token as `Authorization: Bearer <token>` and requests its
+        own bundles with `POST /orgs/{org_id}/bundles`; its bundles answer 404 to everyone
+        outside the company. Only a token from our own user pool counts as a login: any other
+        bearer token is treated as no credentials, so testers that forward their own shared
+        token are unaffected. An expired or invalid token from our pool gets 401, never the test
+        data.
+      - Bundle requests are rate limited (429): 120 a minute per IP address without a login,
+        well above a full tester run.
     - Why: Phase 4 left Jenkins and Confluence untested across teams (Phase 4 LIM-02); AC-05
       had only ever exercised a GitHub failure. A pinned source returns the same bytes on every
       run, so it keeps the suite repeatable, which was the reason for the Phase 2 rule. Phase 2
       Risk 1 assigned this decision ("whether AC-05 should be evaluated using controlled or
-      test source failures") to the pod.
+      test source failures") to the pod. Company accounts and rate limits let real companies
+      use the service without changing what testers see.
     - Pod agreement: [date and channel: fill in when Team 24 confirms]. Additive: no shared
-      requirement or acceptance criterion changes, only the releases used to evaluate them.
+      requirement or acceptance criterion changes, only the releases used to evaluate them;
+      unauthenticated requests behave as before.
 
     Changes in 1.3.0 (Phase 4): background processing, `GET /version`, the GitHub source and
     the `v2.0` and `v1.2-github-inaccessible` releases, the `source_file`, `classified_by` and
     `classification_evidence` fields, and HTML and CycloneDX SBOM files. The pod's shared
     operations (`POST /bundles`, `GET /bundles/{bundle_id}`) and their required fields are
     unchanged from 1.2.0.
-
-    Changes in 1.4.0 (Phase 5): optional company accounts. **A request with no credentials works
-    exactly as before** and is served the shared test data. A signed-in company sends a Cognito
-    access token as `Authorization: Bearer <token>` and requests its own bundles with
-    `POST /orgs/{org_id}/bundles`; its bundles answer 404 to everyone outside the company. Only a
-    token from our own user pool counts as a login: any other bearer token is treated as no
-    credentials, so testers that forward their own shared token are unaffected. An expired or
-    invalid token from our pool gets 401, never the test data. Bundle requests are rate
-    limited (429): 120 a minute per IP address without a login, well above a full tester run.
 
     Known deviations, also noted on the affected responses:
     - A malformed JSON body (400) or a non-JSON `Content-Type` (415) on `POST /bundles` gets
