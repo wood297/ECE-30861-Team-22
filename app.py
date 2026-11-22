@@ -4,6 +4,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, url_for
+import auth
 from bundle_service import BUNDLE_TTL_SECONDS, MAX_BUNDLE_BYTES, MAX_BUNDLES, archives, process_bundle_safely
 from expiring_store import ExpiringStore
 from selftest import create_test_blueprint
@@ -34,6 +35,9 @@ bundles: ExpiringStore[str, dict] = ExpiringStore(
 # PROCESS_BUNDLES_INLINE to read results straight after the POST.
 executor = ThreadPoolExecutor(max_workers=4)
 app.register_blueprint(create_test_blueprint())
+# Customer login (Phase 5 plan §4). Off, with every request acting as pod-test, until the Cognito
+# settings and app secrets are present
+auth.init_app(app, auth.load_from_env())
 
 @app.route("/", methods=["GET"])
 def index():

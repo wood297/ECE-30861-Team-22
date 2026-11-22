@@ -4,3 +4,5 @@ gunicorn
 defusedxml>=0.7.1,<0.8
 boto3>=1.34.131,<2
 moto[dynamodb,ssm]>=5.0,<6
+PyJWT[crypto]>=2.10,<3
+Flask-WTF>=1.2,<2
