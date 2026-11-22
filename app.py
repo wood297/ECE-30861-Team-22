@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from flask import Flask, g, jsonify, request, send_file, session, url_for
 import auth
+import rate_limits
 from artifact_pipeline import CompanyAccount
 from bundle_service import BUNDLE_TTL_SECONDS, MAX_BUNDLE_BYTES, MAX_BUNDLES, archives, process_bundle_safely
 from expiring_store import ExpiringStore
@@ -70,6 +71,23 @@ def requesting_org(url_org_id: str | None = None):
     return org_id, None
 
 
+def bundle_rate_limited(org_id: str | None) -> float | None:
+    """Count one bundle request against its limit (rate_limits.py): per organization for a company,
+    per IP address for pod-test. None if allowed, else seconds to wait."""
+    if org_id is not None:
+        return rate_limits.org_bundles.hit(org_id)
+    return rate_limits.pod_test_bundles.hit(request.remote_addr or "unknown")
+
+
+def forget_org_bundles(org_id: str) -> int:
+    """Remove a deleted organization's bundles and archives from memory."""
+    owned = [bundle_id for bundle_id in list(bundles) if (bundles.get(bundle_id) or {}).get("_org_id") == org_id]
+    for bundle_id in owned:
+        bundles.pop(bundle_id)
+        archives.pop(bundle_id)
+    return len(owned)
+
+
 def may_read(bundle: dict) -> bool:
     """pod-test bundles are readable by anyone with the ID (§5). A company's only by its members;
     everyone else gets the same 404 as an unknown ID."""
@@ -128,6 +146,13 @@ def start_bundle(url_org_id):
 
     if not isinstance(data.get("release_version"), str) or not data["release_version"].strip():
         return jsonify({"error": "release_version is required and must be a nonempty string"}), 400
+
+    wait = bundle_rate_limited(org_id)
+    if wait is not None:
+        limit = rate_limits.ORG_BUNDLES_PER_MINUTE if org_id else rate_limits.POD_TEST_BUNDLES_PER_MINUTE
+        response = jsonify({"error": f"Too many bundle requests: at most {limit} a minute. Try again shortly."})
+        response.headers["Retry-After"] = str(max(1, int(wait + 0.999)))
+        return response, 429
 
     # Spec 5.1: the 202 acknowledges the queued task as PENDING; results come from GET
     return jsonify(submit_bundle(data["product_id"], data["release_version"], org_id)), 202

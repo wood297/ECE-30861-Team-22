@@ -1,0 +1,42 @@
+{% extends "account/base.html" %}
+{% block content %}
+<p>This service collects a product release's EU Cyber Resilience Act (Annex VII) documents from the
+  places a company keeps them, and bundles them. It's a course project (ECE 30861, Team 22) running in
+  Amazon Web Services' <strong>us-east-2</strong> (Ohio) region.</p>
+
+<h2>What we store, and where</h2>
+<table>
+  <tr><th>What</th><th>Where</th><th>How long</th></tr>
+  <tr><td>Your name, email address and password (and an authenticator app, if you add one)</td>
+      <td>Amazon Cognito. We never see your password</td><td>Until you delete your account</td></tr>
+  <tr><td>Organizations, who belongs to them and their roles, pending invites (by email address),
+      connection settings, products and releases</td>
+      <td>Amazon DynamoDB, keyed by organization</td><td>Until the organization or your account is deleted;
+      invites expire after 7 days</td></tr>
+  <tr><td>Connection tokens (GitHub, Confluence, Jenkins)</td>
+      <td>AWS Systems Manager Parameter Store, encrypted with AWS KMS. Never shown again after you enter one</td>
+      <td>Until the connection or organization is deleted</td></tr>
+  <tr><td>Bundles, and the files fetched for them</td><td>The server's memory only</td>
+      <td>An hour for bundles, 10 minutes for fetched files, and never past a restart</td></tr>
+  <tr><td>Server logs</td><td>The server</td><td>They record the organization, connection and outcome of
+      each fetch, never a token or a file's contents</td></tr>
+</table>
+
+<h2>Classification by Amazon Bedrock</h2>
+<p>When a file's name or first heading doesn't settle which document it is, its text is sent to a model
+  on Amazon Bedrock in us-east-2 to classify it. AWS states that Bedrock doesn't store prompts or use them to train models.
+  Each company can make at most 200 such calls a day.</p>
+
+<h2>Who can see your company's data</h2>
+<p>Only your organization's members, through their own sign-in. Other companies can't see your
+  connections, products, releases or bundles. Requests without a sign-in only ever see the shared
+  course test data.</p>
+
+<h2>Deleting your data</h2>
+<ul>
+  <li><strong>An organization:</strong> an admin deletes it from its members page. Its tokens are deleted
+    first, then every record.</li>
+  <li><strong>Your account:</strong> delete it from <a href="{{ url_for('account.account') }}">your account
+    page</a>. This removes your sign-in, your memberships, and organizations where you're the only member.</li>
+</ul>
+{% endblock %}

@@ -464,6 +464,11 @@ def callback():
     return redirect(url_for("account.home"))
 
 
+@bp.route("/privacy", methods=["GET"])
+def privacy():
+    return render_template("account/privacy.html", title="Privacy")
+
+
 @bp.route("/auth/logout", methods=["POST"])
 def logout():
     state = _state()

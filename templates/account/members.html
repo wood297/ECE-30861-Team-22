@@ -72,6 +72,16 @@
   <label>Name <input name="name" maxlength="100" value="{{ g.org.name }}" required></label>
   <button type="submit">Rename</button>
 </form>
+
+<h2>Delete this organization</h2>
+<p class="muted">Deletes its connections and their tokens, products, releases, members, invites and
+  bundles. It can't be undone.</p>
+<form class="block" method="post" action="{{ url_for('account.delete_org') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Type its name, <strong>{{ g.org.name }}</strong>, to confirm
+    <input name="confirm_name" maxlength="100" autocomplete="off" required></label>
+  <button class="danger" type="submit">Delete organization</button>
+</form>
 {% endif %}
 
 <form class="block" method="post" action="{{ url_for('account.leave') }}">

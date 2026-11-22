@@ -33,7 +33,8 @@ info:
     `POST /orgs/{org_id}/bundles`; its bundles answer 404 to everyone outside the company. Only a
     token from our own user pool counts as a login: any other bearer token is treated as no
     credentials, so testers that forward their own shared token are unaffected. An expired or
-    invalid token from our pool gets 401, never the test data.
+    invalid token from our pool gets 401, never the test data. Bundle requests are rate
+    limited (429): 120 a minute per IP address without a login, well above a full tester run.
 
     Known deviations, also noted on the affected responses:
     - A malformed JSON body (400) or a non-JSON `Content-Type` (415) on `POST /bundles` gets
@@ -143,6 +144,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: |
+            Too many bundle requests (Phase 5): at most 120 a minute per IP address without a
+            login, or 30 a minute per organization. `Retry-After` says how many seconds to wait.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '415':
           description: |
             The request's `Content-Type` is not `application/json`. Known deviation: the body
@@ -206,6 +219,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: No such organization, or the caller isn't a member (the same answer).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: |
+            Too many bundle requests (Phase 5): at most 120 a minute per IP address without a
+            login, or 30 a minute per organization. `Retry-After` says how many seconds to wait.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
           content:
             application/json:
               schema:

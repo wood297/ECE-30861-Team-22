@@ -30,6 +30,8 @@ from decimal import Decimal
 from typing import Any, Callable, Protocol
 
 ROLES = ("admin", "member")
+# Stands in for a deleted person wherever a record names who did something (step 5.4)
+DELETED_USER = "deleted-user"
 CONNECTION_STATUSES = ("active", "disconnected")
 
 # Product and release IDs come from the pod's requests (e.g. "prd-88", "v1.2-github-inaccessible").
@@ -143,6 +145,7 @@ class TenantStore(Protocol):
     def rename_org(self, org_id: str, name: str) -> Organization: ...
     def delete_org(self, org_id: str) -> None: ...
     def count_orgs_created_by(self, sub: str) -> int: ...
+    def forget_creator(self, sub: str) -> int: ...
 
     # Members
     def get_member(self, org_id: str, sub: str) -> Membership | None: ...
@@ -242,6 +245,15 @@ class InMemoryTenantStore:
         check_sub(sub)
         with self._lock:
             return sum(org.created_by == sub for org in self._orgs.values())
+
+    def forget_creator(self, sub: str) -> int:
+        """A deleted person's account: organizations they created no longer name them."""
+        check_sub(sub)
+        with self._lock:
+            mine = [org for org in self._orgs.values() if org.created_by == sub]
+            for org in mine:
+                self._orgs[org.org_id] = replace(org, created_by=DELETED_USER)
+            return len(mine)
 
     # Members
 
@@ -600,6 +612,23 @@ class DynamoTenantStore:
             while pending:
                 response = self._client.batch_write_item(RequestItems=pending)
                 pending = response.get("UnprocessedItems") or {}
+
+    def forget_creator(self, sub: str) -> int:
+        """A deleted person's account: organizations they created no longer name them, and their
+        CREATED# records (which only counted toward their creation cap) are removed."""
+        check_sub(sub)
+        created = self._query("USER#" + sub, "CREATED#")
+        for item in created:
+            org_id = item["SK"][len("CREATED#"):]
+            try:
+                self._client.update_item(
+                    TableName=self.table, Key=self._key(_org_pk(org_id), "META"),
+                    UpdateExpression="SET created_by = :deleted", ConditionExpression="created_by = :sub",
+                    ExpressionAttributeValues={":deleted": {"S": DELETED_USER}, ":sub": {"S": sub}})
+            except self._client.exceptions.ConditionalCheckFailedException:
+                pass   # the organization is gone, or already forgot them
+            self._client.delete_item(TableName=self.table, Key=self._key("USER#" + sub, item["SK"]))
+        return len(created)
 
     def count_orgs_created_by(self, sub: str) -> int:
         check_sub(sub)

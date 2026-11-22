@@ -27,7 +27,9 @@ from pathlib import Path, PurePath
 from typing import Any, Protocol, cast
 
 from account_config import AccountConfig, load_account
-from artifact_classifier import CATEGORIES, RESPONSE_SCHEMA, SYSTEM_PROMPT, LLMProvider, classify_artifact
+import rate_limits
+from artifact_classifier import (CATEGORIES, RESPONSE_SCHEMA, SYSTEM_PROMPT, DailyLimitReached, LLMProvider,
+                                 classify_artifact)
 from artifact_formats import ValidationResult, validate_artifact
 from bedrock_adapter import BedrockProvider, BedrockProviderError
 from connectors import REGISTRY, make_context
@@ -153,6 +155,23 @@ def get_provider() -> LLMProvider | None:
     except (ValueError, BedrockProviderError):
         logger.warning("Bedrock is enabled but its provider couldn't be set up")
         return None
+
+
+class CappedProvider:
+    """A company's view of the provider: each real call uses one of its daily Bedrock calls
+    (rate_limits.bedrock_calls). Answers served from the proposal cache cost nothing."""
+
+    def __init__(self, provider: LLMProvider, org_id: str):
+        self._provider = provider
+        self._org_id = org_id
+        # Part of the proposal cache key, so a company shares cached answers with everyone
+        self.model_id = getattr(provider, "model_id", "unknown")
+
+    def classify(self, *, system_prompt: str, artifact_json: str, response_schema: dict) -> str:
+        if not rate_limits.bedrock_calls.take(self._org_id):
+            raise DailyLimitReached()
+        return self._provider.classify(system_prompt=system_prompt, artifact_json=artifact_json,
+                                       response_schema=response_schema)
 
 
 def propose_category(validation: ValidationResult, provider: LLMProvider) -> Proposal:
@@ -398,6 +417,14 @@ def clear_pinned_cache():
     _pinned.clear()
 
 
+def forget_org(org_id: str) -> int:
+    """Drop an organization's cached fetches (its files' bytes), when it's deleted."""
+    keys = [key for key in list(_pinned) if key[0] == org_id]
+    for key in keys:
+        _pinned.pop(key)
+    return len(keys)
+
+
 class _GuardedSecrets:
     """Any secret-store failure (no AWS credentials, access denied) reads as "not stored", so a
     broken store costs a category AUTH_FAILED instead of an error. Only the error type is logged."""
@@ -602,8 +629,10 @@ def retrieve_and_classify(bundle, company: CompanyAccount | None = None):
             bundle["error"] = f"No documents found for {product} {release}"
             bundle["status"] = "FAILED"
             return bundle
-        decisions, sources = decide_from_account(resolved, product, release, get_provider(),
-                                                 secrets=company.secrets)
+        provider = get_provider()
+        if provider is not None:
+            provider = CappedProvider(provider, company.org_id)
+        decisions, sources = decide_from_account(resolved, product, release, provider, secrets=company.secrets)
     elif (account := account_sources(ACCOUNT, product, release)) is not None:
         decisions, sources = decide_from_account(account, product, release, get_provider())
     else:

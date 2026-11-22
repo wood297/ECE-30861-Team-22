@@ -11,12 +11,16 @@
     POST /app/members/<sub>/remove              admin: remove someone
     POST /app/leave                             leave the active organization
     POST /app/org/rename                        admin: rename the active organization
+    POST /app/org/delete                        admin: delete it, its tokens and everything in it
+    GET  /app/account                           your account, and deleting it
+    POST /app/account/delete                    delete your account (step 5.4)
 
 Only browser sessions reach these pages; API callers and the tester get sent to sign in. The
 active organization comes from the session but is checked against your MEMBER record on every
 request (accounts.py), so a stale or forged org_id in the cookie gets you nothing.
 """
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
 
@@ -190,6 +194,57 @@ def leave():
     session["org_id"] = None
     flash(f"You've left {name}.", "ok")
     return redirect(url_for("account.home"))
+
+
+@bp.route("/org/delete", methods=["POST"])
+def delete_org():
+    if (answer := _need_org()) is not None:
+        return answer
+    from app import forget_org_bundles
+    import artifact_pipeline
+    state = _state()
+    try:
+        org = state.accounts.delete_org(g.org.org_id, g.sub, state.secrets, request.form.get("confirm_name", ""))
+    except AccountError as error:
+        return _refused(error, "account.members")
+    forget_org_bundles(org.org_id)
+    artifact_pipeline.forget_org(org.org_id)
+    session["org_id"] = None
+    flash(f"Deleted {org.name}, its connections and tokens, products, releases, members and invites.", "ok")
+    return redirect(url_for("account.home"))
+
+
+@bp.route("/account", methods=["GET"])
+def account():
+    accounts = _state().accounts
+    return render_template("account/account.html", title="Your account", email=g.email,
+                           blockers=accounts.account_blockers(g.sub), orgs=accounts.my_orgs(g.sub))
+
+
+@bp.route("/account/delete", methods=["POST"])
+def delete_account():
+    from app import forget_org_bundles
+    import artifact_pipeline
+    state = _state()
+    if request.form.get("confirm", "").strip().lower() != "delete my account":
+        flash("Type \"delete my account\" to confirm.", "error")
+        return redirect(url_for("account.account"))
+    try:
+        deleted = state.accounts.delete_account(g.sub, g.email, state.secrets)
+    except AccountError as error:
+        return _refused(error, "account.account")
+    for org_id in deleted:
+        forget_org_bundles(org_id)
+        artifact_pipeline.forget_org(org_id)
+    try:
+        state.directory.delete_user(g.sub)
+    except Exception:
+        flash("Your organizations and memberships were deleted, but your sign-in couldn't be. "
+              "Please try again.", "error")
+        return redirect(url_for("account.account"))
+    session.clear()
+    query = urlencode({"client_id": state.config.client_id, "logout_uri": url_for("index", _external=True)})
+    return redirect(f"https://{state.config.domain}/logout?{query}")
 
 
 @bp.route("/org/rename", methods=["POST"])

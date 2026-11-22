@@ -287,6 +287,10 @@ def request_bundle():
     if not product_id or not release:
         flash("Enter a product and a release.", "error")
         return redirect(request.referrer or url_for("account.products"))
+    from app import bundle_rate_limited
+    if bundle_rate_limited(g.org.org_id) is not None:
+        flash("Too many bundle requests from this organization. Wait a minute and try again.", "error")
+        return redirect(request.referrer or url_for("account.products"))
     bundle = submit_bundle(product_id, release, g.org.org_id)
     return redirect(url_for("account.bundle", bundle_id=bundle["bundle_id"]))
 

@@ -1,0 +1,26 @@
+{% extends "account/base.html" %}
+{% block content %}
+<p>Signed in{% if email %} as <strong>{{ email }}</strong>{% endif %}.
+  You're in {{ orgs|length }} organization{{ "" if orgs|length == 1 else "s" }}.
+  See <a href="{{ url_for('auth.privacy') }}">what we store</a>.</p>
+
+<h2>Delete your account</h2>
+<p>This deletes your sign-in, and:</p>
+<ul>
+  <li>every organization where you're the only member, with its connections, tokens, products and releases</li>
+  <li>your membership of every other organization</li>
+  <li>pending invites to your email address</li>
+</ul>
+<p>It can't be undone.</p>
+{% if blockers %}
+<p class="flash error">You're the only admin of
+  {% for org in blockers %}<strong>{{ org.name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %},
+  which has other members. Make someone else an admin there, or delete the organization, first.</p>
+{% else %}
+<form class="block" method="post" action="{{ url_for('account.delete_account') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Type <code>delete my account</code> to confirm <input name="confirm" autocomplete="off" required></label>
+  <button class="danger" type="submit">Delete my account</button>
+</form>
+{% endif %}
+{% endblock %}

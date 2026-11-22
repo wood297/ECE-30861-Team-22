@@ -35,6 +35,7 @@
       <a href="{{ url_for('account.connections') }}">Connections</a>
       <a href="{{ url_for('account.products') }}">Products</a>
       {% endif %}
+      <a href="{{ url_for('account.account') }}">Account</a>
       <form method="post" action="{{ url_for('auth.logout') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit">Sign out</button>

@@ -20,7 +20,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
 from expiring_store import ExpiringStore
-from tenant_store import (AlreadyExists, Invite, Membership, NotFound, Organization, TenantStore,
+from secret_store import SecretStore
+from tenant_store import (DELETED_USER, AlreadyExists, Invite, Membership, NotFound, Organization, TenantStore,
                           check_role, check_sub, check_uuid, normalize_email)
 
 MAX_ORGS_CREATED = 3
@@ -227,13 +228,86 @@ class Accounts:
             self.store.remove_member(org_id, sub)
 
 
+    # Deletion (step 5.4)
+
+    def delete_org(self, org_id: str, actor: str, secrets: SecretStore, confirm_name: str) -> Organization:
+        """An admin deletes the organization: its tokens first, then every record. The name must be
+        typed to confirm. Returns what was deleted."""
+        with self._lock:
+            self.require(org_id, actor, admin=True)
+            org = self.store.get_org(org_id)
+            if org is None:
+                raise _not_found()
+            if (confirm_name or "").strip() != org.name:
+                raise AccountError("Type the organization's name exactly to confirm.")
+            self._delete_org(org_id, secrets)
+            return org
+
+    def _delete_org(self, org_id: str, secrets: SecretStore) -> None:
+        # Tokens first: if that fails, nothing has been deleted yet and it can simply be retried
+        try:
+            secrets.delete_org_secrets(org_id)
+        except Exception:
+            raise AccountError("The organization's tokens couldn't be deleted, so nothing was. Try again.",
+                               503) from None
+        self.store.delete_org(org_id)
+
+    def account_blockers(self, sub: str) -> list[Organization]:
+        """Organizations where this person is the only admin but not the only member. Their
+        account can't be deleted until someone else is made an admin, or they delete the org."""
+        blockers = []
+        for membership in self.store.list_user_orgs(sub):
+            if membership.role != "admin":
+                continue
+            members = self.store.list_members(membership.org_id)
+            admins = [m for m in members if m.role == "admin"]
+            org = self.store.get_org(membership.org_id)
+            if org is not None and len(admins) == 1 and len(members) > 1:
+                blockers.append(org)
+        return blockers
+
+    def delete_account(self, sub: str, email: str | None, secrets: SecretStore) -> list[str]:
+        """Everything we hold about a person, except their Cognito user, which the caller deletes
+        last. Organizations where they're the only member are deleted with them; in the others,
+        their membership goes and records that name them say DELETED_USER instead. Invites to
+        their verified email are withdrawn. Returns the org_ids deleted."""
+        check_sub(sub)
+        with self._lock:
+            if blockers := self.account_blockers(sub):
+                names = ", ".join(org.name for org in blockers)
+                raise AccountError(f"You're the only admin of {names}. Make someone else an admin, or delete "
+                                   "the organization, first.", 409)
+            deleted = []
+            for membership in self.store.list_user_orgs(sub):
+                org_id = membership.org_id
+                if len(self.store.list_members(org_id)) == 1:
+                    self._delete_org(org_id, secrets)
+                    deleted.append(org_id)
+                    continue
+                for invite in self.store.list_invites(org_id):
+                    if invite.invited_by == sub:
+                        self.store.create_invite(org_id, invite.email, invite.role, DELETED_USER, invite.expires_at)
+                self.store.remove_member(org_id, sub)
+            if email:
+                for invite in self.store.invites_for_email(email):
+                    self.store.delete_invite(invite.org_id, email)
+            self.store.forget_creator(sub)
+            return deleted
+
+
 class UserDirectory(Protocol):
     def describe(self, sub: str) -> dict[str, str] | None:
         """{"email": ..., "name": ...} for a Cognito user, or None if unknown or unreachable."""
 
+    def delete_user(self, sub: str) -> None:
+        """Delete the Cognito user. Already gone counts as done; anything else raises."""
+
 
 class NoDirectory:
     def describe(self, sub: str) -> dict[str, str] | None:
+        return None
+
+    def delete_user(self, sub: str) -> None:
         return None
 
 
@@ -262,3 +336,15 @@ class CognitoDirectory:
         found = {"email": attributes.get("email", ""), "name": attributes.get("name", "")}
         self._cache[sub] = found
         return found
+
+    def delete_user(self, sub: str) -> None:
+        self._cache.pop(sub)
+        if self._client is None:
+            import boto3
+            self._client = boto3.client("cognito-idp", region_name=self._region)
+        try:
+            self._client.admin_delete_user(UserPoolId=self.pool_id, Username=sub)
+        except Exception as error:
+            if type(error).__name__ == "UserNotFoundException" or "UserNotFoundException" in str(error):
+                return
+            raise

@@ -67,6 +67,15 @@ def offline_connectors():
         yield
 
 
+@pytest.fixture(autouse=True, scope="session")
+def no_rate_limits():
+    """One test process sends thousands of requests from 127.0.0.1; tests that check the limits
+    turn them back on (rate_limits.set_enabled)."""
+    import rate_limits
+    rate_limits.set_enabled(False)
+    yield
+
+
 @pytest.fixture(autouse=True)
 def isolate_connectors(monkeypatch):
     """No test reads a developer's real tokens or another test's cached fetches."""
