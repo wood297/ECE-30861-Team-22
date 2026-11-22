@@ -52,14 +52,15 @@ def error(message, status):
 
 
 def list_fixtures():
+    """Every release this system can serve: the fixtures/ folders and the pod-test account's
+    releases (test_account.json), each once, sorted."""
     root = artifact_pipeline.FIXTURES_ROOT
-    if not root.is_dir():
-        return []
-    return [
-        {"product_id": product.name, "release_version": release.name}
-        for product in sorted(root.iterdir()) if product.is_dir()
-        for release in sorted(product.iterdir()) if release.is_dir()
-    ]
+    releases = set(artifact_pipeline.ACCOUNT.releases)
+    if root.is_dir():
+        releases |= {(product.name, release.name)
+                     for product in root.iterdir() if product.is_dir()
+                     for release in product.iterdir() if release.is_dir()}
+    return [{"product_id": product, "release_version": release} for product, release in sorted(releases)]
 
 
 def parse_junit(path):
