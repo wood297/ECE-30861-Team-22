@@ -1,0 +1,35 @@
+{% extends "account/base.html" %}
+{% from "account/_fields.html" import fields %}
+{% block content %}
+<p><a href="{{ url_for('account.connections') }}">← Connections</a></p>
+{% if is_admin %}
+<form class="block" method="post" action="{{ url_for('account.edit_connection', conn_id=conn.conn_id) }}" autocomplete="off">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {{ fields(connector.settings_fields, values,
+            secret_note="Leave blank to keep the stored token. Required if the server address changes.") }}
+  <button type="submit">Save</button>
+</form>
+{% else %}
+<table>
+  {% for k, v in conn.settings.items() %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}
+  <tr><th>Token</th><td>{% if conn.secret_path %}stored{% else %}none{% endif %}</td></tr>
+</table>
+{% endif %}
+
+<h2>Used by</h2>
+{% if usage %}
+<ul>
+  {% for p in usage.products %}<li><a href="{{ url_for('account.product', product_id=p) }}">Product {{ p }}</a> (rules)</li>{% endfor %}
+  {% for p, r in usage.releases %}<li><a href="{{ url_for('account.release', product_id=p, release=r) }}">{{ p }} {{ r }}</a> (pins)</li>{% endfor %}
+</ul>
+{% else %}
+<p class="muted">Nothing yet.</p>
+{% endif %}
+
+{% if is_admin %}
+<form class="block" method="post" action="{{ url_for('account.delete_connection', conn_id=conn.conn_id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="danger" type="submit" {% if usage %}disabled title="Still in use"{% endif %}>Delete connection and token</button>
+</form>
+{% endif %}
+{% endblock %}

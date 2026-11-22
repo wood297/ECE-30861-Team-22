@@ -1,0 +1,23 @@
+{% extends "account/base.html" %}
+{% block content %}
+{% if products %}
+<table>
+  <tr><th>Product</th><th>Categories with rules</th></tr>
+  {% for p in products %}
+  <tr>
+    <td><a href="{{ url_for('account.product', product_id=p.product_id) }}">{{ p.product_id }}</a></td>
+    <td>{{ p.rules|length }} of 4</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No products yet. A product says where each of its documents lives, for every release.</p>
+{% endif %}
+{% if is_admin %}
+<form class="block" method="post" action="{{ url_for('account.create_product') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Product ID <input name="product_id" maxlength="128" placeholder="prd-88" required></label>
+  <button type="submit">Create</button>
+</form>
+{% endif %}
+{% endblock %}

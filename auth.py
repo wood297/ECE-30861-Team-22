@@ -51,7 +51,8 @@ from flask.sessions import SecureCookieSessionInterface
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from safe_http import SafeHttpClient, SafeHttpError
-from secret_store import LocalFileSecretStore, SecretStore, SecretStoreError, SsmSecretStore
+from org_sources import OrgSources, TokenCheck, check_token
+from secret_store import InMemorySecretStore, LocalFileSecretStore, SecretStore, SecretStoreError, SsmSecretStore
 from tenant_store import DynamoTenantStore, InMemoryTenantStore
 
 log = logging.getLogger(__name__)
@@ -248,6 +249,13 @@ class AuthState:
     clock: Callable[[], float] = time.time
     accounts: Accounts = field(default_factory=lambda: Accounts(InMemoryTenantStore()))
     directory: UserDirectory = field(default_factory=NoDirectory)
+    # Where companies' connection tokens are written and read (step 5.3)
+    secrets: SecretStore = field(default_factory=InMemorySecretStore)
+    token_check: TokenCheck = check_token
+
+    @property
+    def sources(self) -> OrgSources:
+        return OrgSources(self.accounts, self.secrets, self.token_check)
 
 
 @dataclass(frozen=True)
@@ -313,7 +321,8 @@ def load_from_env(env: Mapping[str, str] = os.environ) -> tuple[AuthState, str] 
         log.error("accounts are off: couldn't open the tenant table (%s)", type(error).__name__)
         return None
     return AuthState(config, TokenVerifier(config), CognitoClient(config, client_secret),
-                     accounts=accounts, directory=CognitoDirectory(config.pool_id, config.region)), secret_key
+                     accounts=accounts, directory=CognitoDirectory(config.pool_id, config.region),
+                     secrets=store), secret_key
 
 
 csrf = CSRFProtect()
@@ -503,6 +512,7 @@ def init_app(app: Flask, loaded: tuple[AuthState, str] | None) -> None:
     csrf.init_app(app)
     app.register_blueprint(bp)
     from account_pages import bp as account_bp
+    import source_pages  # noqa: F401  # adds the connection, product and bundle pages to account_bp
     app.register_blueprint(account_bp)
     app.before_request(resolve_identity)
     app.after_request(_security_headers)

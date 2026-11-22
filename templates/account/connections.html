@@ -1,0 +1,43 @@
+{% extends "account/base.html" %}
+{% from "account/_fields.html" import fields %}
+{% block content %}
+{% if connections %}
+<table>
+  <tr><th>Type</th><th>Settings</th><th>Token</th><th></th></tr>
+  {% for c in connections %}
+  <tr>
+    <td>{{ registry[c.type].display_name }}</td>
+    <td>{% for k, v in c.settings.items() %}{{ k }}: {{ v }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+    <td>{% if c.secret_path %}stored{% else %}<span class="muted">none</span>{% endif %}</td>
+    <td><a href="{{ url_for('account.connection', conn_id=c.conn_id) }}">{% if is_admin %}Edit{% else %}View{% endif %}</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No connections yet. A connection is one place your documents live: a GitHub repository, a
+  Confluence site or a Jenkins server.</p>
+{% endif %}
+
+{% if is_admin %}
+{% if connections|length < max_connections %}
+{% for t in types %}
+{% set connector = registry[t] %}
+<details>
+  <summary><strong>Add a {{ connector.display_name }} connection</strong></summary>
+  <form class="block" method="post" action="{{ url_for('account.add_connection', conn_type=t) }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if t == "github" %}
+    <p class="muted">Create a <strong>fine-grained</strong> personal access token with read-only
+      <em>Contents</em> access to this one repository. We check it can read the repository before saving.</p>
+    {% endif %}
+    {{ fields(connector.settings_fields, {}) }}
+    <button type="submit">Add</button>
+  </form>
+</details>
+{% endfor %}
+<p class="muted">Tokens are stored encrypted and are never shown again. At most {{ max_connections }} connections.</p>
+{% else %}
+<p class="muted">This organization has the most connections allowed ({{ max_connections }}).</p>
+{% endif %}
+{% endif %}
+{% endblock %}

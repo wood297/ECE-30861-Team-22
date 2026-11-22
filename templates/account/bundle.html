@@ -1,0 +1,22 @@
+{% extends "account/base.html" %}
+{% block head %}{% if not done %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block content %}
+<p>Status: <strong>{{ bundle.status }}</strong>{% if not done %} <span class="muted">(this page reloads until it's done)</span>{% endif %}</p>
+{% if bundle.error %}<p class="flash error">{{ bundle.error }}</p>{% endif %}
+{% if bundle.manifest %}
+<table>
+  <tr><th>Category</th><th>Status</th><th>Source</th><th>File</th><th>Detail</th></tr>
+  {% for item in bundle.manifest %}
+  <tr>
+    <td>{{ item.category }}</td><td>{{ item.status }}</td><td>{{ item.external_source }}</td>
+    <td>{{ item.source_file or "" }}</td><td>{{ item.source_failure_detail or "" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% if has_archive %}
+<p><a class="button" href="{{ url_for('download_bundle', bundle_id=bundle.bundle_id) }}">Download the bundle (ZIP)</a></p>
+{% endif %}
+<p class="muted">Bundle ID {{ bundle.bundle_id }}. It's kept for an hour. API callers can read it at
+  <code>GET {{ url_for('get_bundle', bundle_id=bundle.bundle_id) }}</code>.</p>
+{% endblock %}

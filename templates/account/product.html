@@ -1,0 +1,83 @@
+{% extends "account/base.html" %}
+{% block content %}
+<p><a href="{{ url_for('account.products') }}">← Products</a>
+  {% if release %} · <a href="{{ url_for('account.product', product_id=product.product_id) }}">Product {{ product.product_id }}</a>{% endif %}</p>
+
+{% if release %}
+<p class="muted">Pins for this release. A category without a pin uses the product's rule.</p>
+{% else %}
+<p class="muted">Rules apply to every release. <code>{product}</code> and <code>{release}</code> are filled in
+  when a bundle is requested. A release can pin a category to override its rule.</p>
+{% endif %}
+
+<table>
+  <tr><th>Category</th><th>Connection</th><th>{% if release %}Pin{% else %}Rule{% endif %}</th>{% if is_admin %}<th></th>{% endif %}</tr>
+  {% for row in rows %}
+  <tr>
+    <td>{{ row.category }}</td>
+    {% if row.entry %}
+    <td>{{ row.conn }}</td><td><code>{{ row.ref }}</code></td>
+    {% elif row.inherited %}
+    <td colspan="2" class="muted">From the product's rule</td>
+    {% else %}
+    <td colspan="2" class="muted">Not set: reported as MISSING</td>
+    {% endif %}
+    {% if is_admin %}
+    <td>
+      <a href="{{ url_for('account.entry', product_id=product.product_id, category=row.category, release=release) }}">Set</a>
+      {% if row.entry %}
+      <form method="post" action="{{ url_for('account.clear_entry', product_id=product.product_id, category=row.category) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if release %}<input type="hidden" name="release" value="{{ release }}">{% endif %}
+        <button type="submit">Clear</button>
+      </form>
+      {% endif %}
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Request a bundle</h2>
+<form class="block" method="post" action="{{ url_for('account.request_bundle') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="product_id" value="{{ product.product_id }}">
+  {% if release %}
+  <input type="hidden" name="release_version" value="{{ release }}">
+  <button type="submit">Request a bundle for {{ product.product_id }} {{ release }}</button>
+  {% else %}
+  <label>Release <input name="release_version" maxlength="128" placeholder="v1.2" required></label>
+  <button type="submit">Request</button>
+  {% endif %}
+</form>
+
+{% if not release %}
+<h2>Pinned releases</h2>
+{% if releases %}
+<ul>{% for r in releases %}<li><a href="{{ url_for('account.release', product_id=product.product_id, release=r.release) }}">{{ r.release }}</a></li>{% endfor %}</ul>
+{% else %}
+<p class="muted">None. Every release uses the rules above.</p>
+{% endif %}
+{% if is_admin %}
+<form class="block" method="post" action="{{ url_for('account.create_release', product_id=product.product_id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Release <input name="release" maxlength="128" placeholder="v1.2" required></label>
+  <button type="submit">Pin a release</button>
+</form>
+{% endif %}
+{% endif %}
+
+{% if is_admin %}
+{% if release %}
+<form class="block" method="post" action="{{ url_for('account.delete_release', product_id=product.product_id, release=release) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="danger" type="submit">Delete these pins</button>
+</form>
+{% else %}
+<form class="block" method="post" action="{{ url_for('account.delete_product', product_id=product.product_id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="danger" type="submit">Delete product and its releases</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}

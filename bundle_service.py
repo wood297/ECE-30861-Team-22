@@ -70,7 +70,7 @@ def _add(archive, name, data):
     archive.writestr(info, data)
 
 
-def process_bundle(bundle):
+def process_bundle(bundle, company=None):
     """
     Processes a bundle request.
 
@@ -83,7 +83,7 @@ def process_bundle(bundle):
     bundle["status"] = "PROCESSING"
 
     # Person 2: fills in bundle["artifacts"] and bundle["manifest"]
-    retrieve_and_classify(bundle)
+    retrieve_and_classify(bundle, company)
     if bundle["status"] == "FAILED":
         return bundle
 
@@ -95,10 +95,11 @@ def process_bundle(bundle):
     return bundle
 
 
-def process_bundle_safely(bundle):
-    """Runs process_bundle, making sure a bundle can't stay stuck if something unexpected breaks."""
+def process_bundle_safely(bundle, company=None):
+    """Runs process_bundle, making sure a bundle can't stay stuck if something unexpected breaks.
+    `company` (artifact_pipeline.CompanyAccount) serves a company's bundle from its own account."""
     try:
-        process_bundle(bundle)
+        process_bundle(bundle, company)
     except Exception:
         logger.exception("Processing failed for bundle %s", bundle["bundle_id"])
         bundle["error"] = "Processing failed unexpectedly"

@@ -134,9 +134,9 @@ def test_concurrent_writers_never_exceed_the_cap():
 def system(monkeypatch):
     bundles.clear()
     bundle_service.archives.clear()
-    app.config["PROCESS_BUNDLES_INLINE"] = True
+    # Restored afterwards, so later tests keep the session-wide inline setting (conftest.py)
+    monkeypatch.setitem(app.config, "PROCESS_BUNDLES_INLINE", True)
     yield app.test_client()
-    app.config["PROCESS_BUNDLES_INLINE"] = False
     bundles.clear()
     bundle_service.archives.clear()
 
