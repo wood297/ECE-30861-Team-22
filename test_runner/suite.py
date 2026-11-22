@@ -268,12 +268,35 @@ def _sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def check_categories(case, run, expected):
+def check_categories(case, run, expected, label=""):
+    prefix = f"{label}: " if label else ""
     index = _manifest_index(run.body)
     for category, status in expected.items():
         actual = [item.get("status") for item in index.get(_norm(category), [])]
-        case.check(f"manifest reports '{category}' exactly once as {status}",
+        case.check(f"{prefix}manifest reports '{category}' exactly once as {status}",
                    actual == [status], f"got {actual or 'no entry'}")
+
+
+def check_external_source(case, run, fx, label):
+    """Categories the oracle pins to a source (e.g. Test Logs from Jenkins) must name it, so a
+    system can't pass by quietly serving a local copy instead of fetching from the source."""
+    index = _manifest_index(run.body)
+    for category, source in (fx.get("external_source") or {}).items():
+        entries = index.get(_norm(category), [])
+        got = entries[0].get("external_source") if len(entries) == 1 else None
+        case.check(f"{label}: '{category}' names {source} as its external_source",
+                   isinstance(got, str) and source.lower() in got.lower(), f"got {got!r}")
+
+
+def releases_for(ctx, *keys):
+    """The oracle keys a criterion checks, in order. Phase 5 (spec.yaml 1.4.0) adds the Jenkins
+    releases next to the Phase 4 ones; an oracle without them leaves them out."""
+    return [key for key in keys if key in ctx.oracle.get("releases", {})]
+
+
+def label_of(ctx, key):
+    fx = ctx.fixture(key)
+    return f"{fx['product_id']} {fx['release_version']}"
 
 
 def check_not_collected(case, ctx, run, category):
@@ -441,12 +464,14 @@ def ac01_release_identification(ctx, case):
 @criterion("AC-02", "Complete artifact collection: every category PRESENT and bundle COMPLETED",
            ["REQ-02", "REQ-03", "REQ-05"], ["artifact-retrieval", "classification", "manifest-generation"])
 def ac02_complete_collection(ctx, case):
-    fx = ctx.fixture("complete")
-    run = ctx.bundle(case, "complete")
-    check_categories(case, run, fx["categories"])
-    case.check(f"bundle status is {fx['expected_bundle_status']}",
-               run.body.get("status") == fx["expected_bundle_status"],
-               f"got {run.body.get('status')!r}")
+    for key in releases_for(ctx, "complete", "jenkins_complete"):
+        fx, label = ctx.fixture(key), label_of(ctx, key)
+        run = ctx.bundle(case, key)
+        check_categories(case, run, fx["categories"], label)
+        check_external_source(case, run, fx, label)
+        case.check(f"{label}: bundle status is {fx['expected_bundle_status']}",
+                   run.body.get("status") == fx["expected_bundle_status"],
+                   f"got {run.body.get('status')!r}")
 
 
 @criterion("AC-03", "Missing required artifact is reported as MISSING",
@@ -465,39 +490,48 @@ def ac03_missing_artifact(ctx, case):
 @criterion("AC-04", "Invalid artifact is reported as INVALID and not treated as collected",
            ["REQ-03", "REQ-06"], ["classification"])
 def ac04_invalid_artifact(ctx, case):
-    fx = ctx.fixture("invalid")
-    run = ctx.bundle(case, "invalid")
-    check_categories(case, run, fx["categories"])
-    case.check("bundle is not reported as COMPLETED", run.body.get("status") != "COMPLETED",
-               f"got {run.body.get('status')!r}")
-    for category, status in fx["categories"].items():
-        if status != "PRESENT":
-            check_not_collected(case, ctx, run, category)
+    for key in releases_for(ctx, "invalid", "jenkins_empty"):
+        fx, label = ctx.fixture(key), label_of(ctx, key)
+        run = ctx.bundle(case, key)
+        check_categories(case, run, fx["categories"], label)
+        check_external_source(case, run, fx, label)
+        case.check(f"{label}: bundle is not reported as COMPLETED", run.body.get("status") != "COMPLETED",
+                   f"got {run.body.get('status')!r}")
+        for category, status in fx["categories"].items():
+            if status != "PRESENT":
+                check_not_collected(case, ctx, run, category)
 
 
 @criterion("AC-05", "External source failure is reported as INACCESSIBLE",
            ["REQ-02", "REQ-06", "REQ-07"], ["source-failure-handling"])
 def ac05_source_failure(ctx, case):
-    """Phase 2 AC-05 and the REQ-07 note in Section 5.1, checked in that order:
-    (a) the failed category is INACCESSIBLE and the others keep their expected status,
-    (b) the bundle is PARTIAL_SUCCESS with source_failure_detail on the failed category,
-    (c) a download_url is still provided, and (d) the retrieved evidence is all still there."""
-    fx = ctx.fixture("source_failure")
-    run = ctx.bundle(case, "source_failure")
+    """Phase 2 AC-05 and the REQ-07 note in Section 5.1, for the Phase 4 GitHub failure and the
+    Phase 5 Jenkins failure (spec.yaml 1.4.0)."""
+    for key in releases_for(ctx, "source_failure", "jenkins_missing"):
+        _check_source_failure(ctx, case, key)
+
+
+def _check_source_failure(ctx, case, key):
+    """Checked in this order: (a) the failed category is INACCESSIBLE and the others keep their
+    expected status, (b) the bundle is PARTIAL_SUCCESS with source_failure_detail on the failed
+    category, (c) a download_url is still provided, and (d) the retrieved evidence is all still there."""
+    fx, label = ctx.fixture(key), label_of(ctx, key)
+    run = ctx.bundle(case, key)
     failed = [c for c, s in fx["categories"].items() if s == "INACCESSIBLE"]
 
     # (a)
-    check_categories(case, run, fx["categories"])
+    check_categories(case, run, fx["categories"], label)
+    check_external_source(case, run, fx, label)
 
     # (b)
     status = run.body.get("status")
-    case.check("REQ-07: a partial source failure gives PARTIAL_SUCCESS (neither COMPLETED nor FAILED)",
+    case.check(f"{label}: REQ-07: a partial source failure gives PARTIAL_SUCCESS (neither COMPLETED nor FAILED)",
                status == "PARTIAL_SUCCESS", f"got {status!r}")
     index = _manifest_index(run.body)
     for category in failed:
         entries = index.get(_norm(category), [])
         detail = entries[0].get("source_failure_detail") if len(entries) == 1 else None
-        case.check(f"REQ-07: the {category} entry explains which source or artifact failed "
+        case.check(f"{label}: REQ-07: the {category} entry explains which source or artifact failed "
                    f"(source_failure_detail)", isinstance(detail, str) and bool(detail.strip()),
                    f"got {detail!r}")
         check_not_collected(case, ctx, run, category)
@@ -507,31 +541,33 @@ def ac05_source_failure(ctx, case):
     url = run.body.get("download_url")
     inline = any(isinstance(a, dict) and isinstance(a.get("content"), str)
                  for a in run.body.get("artifacts") or [])
-    case.check("REQ-07: the partial bundle still has a download_url",
+    case.check(f"{label}: REQ-07: the partial bundle still has a download_url",
                True if isinstance(url, str) and url else (None if inline else False),
                "content is returned inline instead" if inline and not url else f"got {url!r}")
 
     # (d) One check for the whole set: which retrieved files went missing or changed
     contents = ctx.collected_contents(run)
-    case.require("the bundle still exposes the evidence that was retrieved", contents is not None,
+    case.require(f"{label}: the bundle still exposes the evidence that was retrieved", contents is not None,
                  "neither artifacts[].content nor a usable download_url found")
     present = {_sha256(data) for _, data in contents}
-    lost = [c for c, data in ctx.expected_contents("source_failure").items() if _sha256(data) not in present]
-    case.check(f"all {len(fx['categories']) - len(failed)} artifacts from the working source are kept unchanged",
-               not lost, f"lost or altered: {lost}" if lost else None)
+    lost = [c for c, data in ctx.expected_contents(key).items() if _sha256(data) not in present]
+    case.check(f"{label}: all {len(fx['categories']) - len(failed)} artifacts from the working source "
+               f"are kept unchanged", not lost, f"lost or altered: {lost}" if lost else None)
 
 
 @criterion("AC-06", "Source fidelity: collected content is byte-for-byte identical to the source",
            ["REQ-05", "REQ-08"], ["content-preservation"])
 def ac06_source_fidelity(ctx, case):
-    run = ctx.bundle(case, "complete")
-    contents = ctx.collected_contents(run)
-    case.require("bundle exposes artifact content (artifacts[].content or download_url)",
-                 contents is not None, "neither artifacts[].content nor a usable download_url found")
-    collected = {_sha256(data) for _, data in contents}
-    for category, data in ctx.expected_contents("complete").items():
-        case.check(f"'{category}' content is preserved exactly (sha256)", _sha256(data) in collected,
-                   f"expected {_sha256(data)[:16]}..., not found among {len(collected)} artifact(s)")
+    for key in releases_for(ctx, "complete", "jenkins_complete"):
+        label = label_of(ctx, key)
+        run = ctx.bundle(case, key)
+        contents = ctx.collected_contents(run)
+        case.require(f"{label}: bundle exposes artifact content (artifacts[].content or download_url)",
+                     contents is not None, "neither artifacts[].content nor a usable download_url found")
+        collected = {_sha256(data) for _, data in contents}
+        for category, data in ctx.expected_contents(key).items():
+            case.check(f"{label}: '{category}' content is preserved exactly (sha256)", _sha256(data) in collected,
+                       f"expected {_sha256(data)[:16]}..., not found among {len(collected)} artifact(s)")
 
 
 @criterion("AC-07", "Repeatable generation: identical inputs give equivalent manifests",

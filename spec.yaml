@@ -25,8 +25,8 @@ info:
       | `v1.4` | PRESENT (SBOM INVALID: empty) | PARTIAL_SUCCESS | AC-04 |
       | `v1.2-github-inaccessible` | INACCESSIBLE: absent at the pinned GitHub commit | PARTIAL_SUCCESS | AC-05 |
       | `v1.5-jenkins` | PRESENT, from Jenkins build 2 | COMPLETED | AC-06 |
-      | `v1.5-jenkins-missing` | INACCESSIBLE: build 3 archives nothing | PARTIAL_SUCCESS | AC-05 |
-      | `v1.5-jenkins-empty` | INVALID: build 4 archives an empty file | PARTIAL_SUCCESS | AC-04 |
+      | `v1.5-jenkins-missing` | INACCESSIBLE: Jenkins build 3 archives nothing | PARTIAL_SUCCESS | AC-05 |
+      | `v1.5-jenkins-empty` | INVALID: Jenkins build 4 archives an empty file | PARTIAL_SUCCESS | AC-04 |
       | `v0.0-does-not-exist` | none | FAILED | API-07 |
 
       In the three `v1.5-jenkins*` releases, Test Logs come from Jenkins
@@ -76,7 +76,7 @@ info:
       Risk 1 assigned this decision ("whether AC-05 should be evaluated using controlled or
       test source failures") to the pod. Company accounts and rate limits let real companies
       use the service without changing what testers see.
-    - Pod agreement: [date and channel: fill in when Team 24 confirms]. Additive: no shared
+    - Pod agreement: 11/22/2026 via messages. Additive: no shared
       requirement or acceptance criterion changes, only the releases used to evaluate them;
       unauthenticated requests behave as before.
 

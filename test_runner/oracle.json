@@ -85,6 +85,45 @@
         "User Instructions": "PRESENT"
       }
     },
+    "jenkins_complete": {
+      "product_id": "prd-88",
+      "release_version": "v1.5-jenkins",
+      "purpose": "Test Logs come from the pod's Jenkins (job pod/cra-test-logs, pinned build 2); the other three are the v1.2 files. Pod fixture agreed with Team 24 for Phase 5 (spec.yaml 1.4.0).",
+      "expected_bundle_status": "COMPLETED",
+      "external_source": {"Test Logs": "Jenkins"},
+      "categories": {
+        "SBOM": "PRESENT",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "PRESENT",
+        "User Instructions": "PRESENT"
+      }
+    },
+    "jenkins_missing": {
+      "product_id": "prd-88",
+      "release_version": "v1.5-jenkins-missing",
+      "purpose": "Test Logs come from a pinned Jenkins build (3) that archived nothing, so that source fails; the other three are the v1.2 files. Phase 5 (spec.yaml 1.4.0).",
+      "expected_bundle_status": "PARTIAL_SUCCESS",
+      "external_source": {"Test Logs": "Jenkins"},
+      "categories": {
+        "SBOM": "PRESENT",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "INACCESSIBLE",
+        "User Instructions": "PRESENT"
+      }
+    },
+    "jenkins_empty": {
+      "product_id": "prd-88",
+      "release_version": "v1.5-jenkins-empty",
+      "purpose": "Test Logs come from a pinned Jenkins build (4) that archived an empty file, which is INVALID; the other three are the v1.2 files. Phase 5 (spec.yaml 1.4.0).",
+      "expected_bundle_status": "PARTIAL_SUCCESS",
+      "external_source": {"Test Logs": "Jenkins"},
+      "categories": {
+        "SBOM": "PRESENT",
+        "Risk Assessment": "PRESENT",
+        "Test Logs": "INVALID",
+        "User Instructions": "PRESENT"
+      }
+    },
     "unknown": {
       "product_id": "prd-88",
       "release_version": "v0.0-does-not-exist",

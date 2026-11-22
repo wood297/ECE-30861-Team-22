@@ -49,6 +49,7 @@ class ReleaseRow:
     bundle: str                      # COMPLETED, PARTIAL_SUCCESS or FAILED
     categories: dict[str, str]       # expected status per category (empty for FAILED)
     sha256: dict[str, str]           # file name in the download -> expected sha256
+    sources: dict[str, str]          # category -> the external_source the table names for it
 
 
 def load_spec(path: Path = SPEC_PATH) -> dict[str, Any]:
@@ -72,8 +73,11 @@ def shared_releases(spec: dict[str, Any]) -> list[ReleaseRow]:
                 expected["Test Logs"] = first
             for category, status in re.findall(rf"({'|'.join(CATEGORIES)}) ({'|'.join(STATUSES)})", test_logs_cell):
                 expected[category] = status
+        # "from Jenkins build 2", "absent at the pinned GitHub commit": Test Logs' source
+        named = re.search(r"\b(Jenkins|GitHub|Confluence)\b", test_logs_cell)
+        sources = {"Test Logs": named.group(1)} if named and bundle != "FAILED" else {}
         for release in re.findall(r"`([^`]+)`", cells[0]):
-            rows.append(ReleaseRow(release, bundle, dict(expected), {}))
+            rows.append(ReleaseRow(release, bundle, dict(expected), {}, dict(sources)))
     # "Build 2's file has sha256 ..." pins the Test Logs bytes of the release built from build 2
     match = re.search(r"sha256\s+`([0-9a-f]{64})`", text)
     for row in rows:
@@ -218,6 +222,11 @@ class Checker:
         wrong = {c: (got.get(c), s) for c, s in row.categories.items() if got.get(c) != s}
         self.record(f"{name}: categories as documented", not wrong,
                     "; ".join(f"{c}: got {g}, expected {e}" for c, (g, e) in wrong.items()))
+        by_category = {item.get("category"): item for item in body.get("manifest") or []}
+        for category, source in row.sources.items():
+            named = (by_category.get(category) or {}).get("external_source")
+            self.record(f"{name}: {category} comes from {source}", named == source,
+                        "" if named == source else f"external_source is {named!r}")
         failed = [i for i in body.get("manifest") or [] if i.get("status") in ("INVALID", "INACCESSIBLE")]
         no_detail = [i.get("category") for i in failed if not str(i.get("source_failure_detail") or "").strip()]
         if failed:

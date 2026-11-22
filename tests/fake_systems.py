@@ -28,10 +28,20 @@ DEFECTS = {
     "hide_source_failure",    # reports a failed external source as MISSING instead of INACCESSIBLE
     "silent_source_failure",  # reports INACCESSIBLE but names no source and gives no diagnostic
     "drop_on_source_failure",  # loses the successfully retrieved artifacts when a source fails
+    "ignore_external_source",  # serves local copies and names "fixtures" instead of the real source
 }
 
-# (product, release, category) whose external source fails, as in the pod's Phase 4 fixture
-FAILING_SOURCES = {("prd-88", "v1.2-github-inaccessible", "Test Logs")}
+# (product, release, category) whose external source fails: the pod's Phase 4 GitHub fixture
+# and the Phase 5 Jenkins one -> (source named, diagnostic)
+FAILING_SOURCES = {
+    ("prd-88", "v1.2-github-inaccessible", "Test Logs"): ("GitHub", "File not found at the pinned commit."),
+    ("prd-88", "v1.5-jenkins-missing", "Test Logs"): ("Jenkins", "Not archived by the pinned build."),
+}
+# Categories that come from an external source that works (Phase 5 Jenkins fixtures)
+EXTERNAL_SOURCES = {
+    ("prd-88", "v1.5-jenkins", "Test Logs"): "Jenkins",
+    ("prd-88", "v1.5-jenkins-empty", "Test Logs"): "Jenkins",
+}
 
 # What the reference system reports from GET /test/report
 CODE_COVERAGE = {"covered": 42, "total": 50, "basis": "Source lines of the reference system"}
@@ -84,11 +94,15 @@ def make_reference_system(*defects):
         manifest, artifacts = [], []
         for category, filename in FILES.items():
             path = folder / filename
-            item = {"category": category, "external_source": "fixtures"}
-            if (product, release, category) in FAILING_SOURCES:
+            key = (product, release, category)
+            real_source = "ignore_external_source" not in defects
+            item = {"category": category,
+                    "external_source": EXTERNAL_SOURCES.get(key, "fixtures") if real_source else "fixtures"}
+            if key in FAILING_SOURCES:
                 status = "MISSING" if "hide_source_failure" in defects else "INACCESSIBLE"
+                source, detail = FAILING_SOURCES[key]
                 if status == "INACCESSIBLE" and "silent_source_failure" not in defects:
-                    item.update(external_source="GitHub", source_failure_detail="File not found at the pinned commit.")
+                    item.update(external_source=source if real_source else "fixtures", source_failure_detail=detail)
                 elif status == "INACCESSIBLE":
                     del item["external_source"]
             elif not path.is_file():
