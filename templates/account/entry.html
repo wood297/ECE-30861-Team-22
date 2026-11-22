@@ -1,0 +1,38 @@
+{% extends "account/base.html" %}
+{% from "account/_fields.html" import fields %}
+{% block content %}
+{% if release %}
+<p><a href="{{ url_for('account.release', product_id=product_id, release=release) }}">← {{ product_id }} {{ release }}</a></p>
+{% else %}
+<p><a href="{{ url_for('account.product', product_id=product_id) }}">← Product {{ product_id }}</a></p>
+{% endif %}
+
+{% if not is_admin %}
+<p>Only an admin can change this.</p>
+{% elif not conns %}
+<p>Add a <a href="{{ url_for('account.connections') }}">connection</a> first.</p>
+{% else %}
+<form class="block" method="get" action="{{ url_for('account.entry', product_id=product_id, category=category) }}">
+  {% if release %}<input type="hidden" name="release" value="{{ release }}">{% endif %}
+  <label>Connection
+    <select name="conn">
+      {% for c in conns %}<option value="{{ c.conn_id }}" {% if conn and c.conn_id == conn.conn_id %}selected{% endif %}>{{ names[c.conn_id] }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit">Choose</button>
+</form>
+
+{% if connector %}
+<form class="block" method="post" action="{{ url_for('account.save_entry', product_id=product_id, category=category) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="conn" value="{{ conn.conn_id }}">
+  {% if release %}<input type="hidden" name="release" value="{{ release }}">{% endif %}
+  {{ fields(connector.ref_fields, values) }}
+  <p class="muted">You can use <code>{product}</code> and <code>{release}</code>, e.g.
+    <code>artifacts/{product}/{release}/sbom.json</code>. Pin things that can't change: a commit SHA,
+    a build number, an attachment version.</p>
+  <button type="submit">Save</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}

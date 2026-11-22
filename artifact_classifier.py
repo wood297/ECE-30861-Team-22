@@ -45,6 +45,10 @@ Return only a JSON object matching response_schema. Do not return rewritten cont
 """
 
 
+class DailyLimitReached(Exception):
+    """A provider refused because its caller's daily allowance is used up (rate_limits.py)."""
+
+
 class LLMProvider(Protocol):
     def classify(self, *, system_prompt: str, artifact_json: str, response_schema: dict) -> str:
         """Return raw JSON text; raise TimeoutError on timeout or an exception on failure."""
@@ -98,6 +102,8 @@ def classify_artifact(artifact: ValidationResult, expected_category: str,
         )
     except TimeoutError:
         return failure("timeout")
+    except DailyLimitReached:
+        return failure("daily_limit")
     except Exception:
         return failure("provider_error")
     try:

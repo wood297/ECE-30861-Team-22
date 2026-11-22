@@ -24,10 +24,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 from html.parser import HTMLParser
 from pathlib import Path, PurePath
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from account_config import AccountConfig, load_account
-from artifact_classifier import CATEGORIES, RESPONSE_SCHEMA, SYSTEM_PROMPT, LLMProvider, classify_artifact
+import rate_limits
+from artifact_classifier import (CATEGORIES, RESPONSE_SCHEMA, SYSTEM_PROMPT, DailyLimitReached, LLMProvider,
+                                 classify_artifact)
 from artifact_formats import ValidationResult, validate_artifact
 from bedrock_adapter import BedrockProvider, BedrockProviderError
 from connectors import REGISTRY, make_context
@@ -38,7 +40,7 @@ from github_artifact_retrieval import RetrievalResult, fetch_configured_artifact
 from github_client import GitHubClient, GitHubConfig
 from safe_http import ByteBudget
 from secret_store import LocalFileSecretStore, Secret, SecretNotFound, SecretStore, SsmSecretStore
-from tenant_store import Connection
+from tenant_store import Connection, Product, Release, TenantStore
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +155,23 @@ def get_provider() -> LLMProvider | None:
     except (ValueError, BedrockProviderError):
         logger.warning("Bedrock is enabled but its provider couldn't be set up")
         return None
+
+
+class CappedProvider:
+    """A company's view of the provider: each real call uses one of its daily Bedrock calls
+    (rate_limits.bedrock_calls). Answers served from the proposal cache cost nothing."""
+
+    def __init__(self, provider: LLMProvider, org_id: str):
+        self._provider = provider
+        self._org_id = org_id
+        # Part of the proposal cache key, so a company shares cached answers with everyone
+        self.model_id = getattr(provider, "model_id", "unknown")
+
+    def classify(self, *, system_prompt: str, artifact_json: str, response_schema: dict) -> str:
+        if not rate_limits.bedrock_calls.take(self._org_id):
+            raise DailyLimitReached()
+        return self._provider.classify(system_prompt=system_prompt, artifact_json=artifact_json,
+                                       response_schema=response_schema)
 
 
 def propose_category(validation: ValidationResult, provider: LLMProvider) -> Proposal:
@@ -398,6 +417,14 @@ def clear_pinned_cache():
     _pinned.clear()
 
 
+def forget_org(org_id: str) -> int:
+    """Drop an organization's cached fetches (its files' bytes), when it's deleted."""
+    keys = [key for key in list(_pinned) if key[0] == org_id]
+    for key in keys:
+        _pinned.pop(key)
+    return len(keys)
+
+
 class _GuardedSecrets:
     """Any secret-store failure (no AWS credentials, access denied) reads as "not stored", so a
     broken store costs a category AUTH_FAILED instead of an error. Only the error type is logged."""
@@ -436,10 +463,40 @@ def get_secret_store() -> SecretStore | None:
     return cast(SecretStore, _GuardedSecrets(store)) if store is not None else None
 
 
-def account_sources(account: AccountConfig, product: str, release: str
-                    ) -> dict[str, tuple[Connection, dict[str, Any]]] | None:
+class AccountReader(Protocol):
+    """What resolving a release reads: the pod-test AccountConfig and a company's account both give it."""
+    @property
+    def org_id(self) -> str: ...
+
+    def get_connection(self, org_id: str, conn_id: str) -> Connection | None: ...
+    def get_product(self, org_id: str, product_id: str) -> Product | None: ...
+    def get_release(self, org_id: str, product_id: str, release: str) -> Release | None: ...
+
+
+class CompanyAccount:
+    """A company's connections, products and releases in the tenant store (step 5.3), and the store
+    holding its tokens. Every read is scoped to the company's org_id."""
+
+    def __init__(self, org_id: str, store: TenantStore, secrets: SecretStore | None):
+        self.org_id = org_id
+        self._store = store
+        self.secrets = cast(SecretStore, _GuardedSecrets(secrets)) if secrets is not None else None
+
+    def get_connection(self, org_id: str, conn_id: str) -> Connection | None:
+        return self._store.get_connection(self.org_id, conn_id) if org_id == self.org_id else None
+
+    def get_product(self, org_id: str, product_id: str) -> Product | None:
+        return self._store.get_product(self.org_id, product_id) if org_id == self.org_id else None
+
+    def get_release(self, org_id: str, product_id: str, release: str) -> Release | None:
+        return self._store.get_release(self.org_id, product_id, release) if org_id == self.org_id else None
+
+
+def account_sources(account: AccountReader, product: str, release: str
+                    ) -> dict[str, tuple[Connection | None, dict[str, Any]]] | None:
     """{category: (connection, concrete ref)} for a release the account defines, or None when it
-    doesn't. A release's pin wins over its product's rule for the same category."""
+    doesn't. A release's pin wins over its product's rule for the same category. The connection is
+    None if it no longer exists (a company's pages prevent that, but a category must never vanish)."""
     org = account.org_id
     pinned = account.get_release(org, product, release)
     product_rules = account.get_product(org, product)
@@ -449,9 +506,8 @@ def account_sources(account: AccountConfig, product: str, release: str
     sources = {}
     for category, entry in entries.items():
         ref = dict(entry)
-        conn = account.get_connection(org, ref.pop("conn"))
-        if conn is not None:   # load_account already guarantees it
-            sources[category] = (conn, fill_ref(ref, product, release))
+        conn = account.get_connection(org, str(ref.pop("conn", "")))
+        sources[category] = (conn, fill_ref(ref, product, release))
     return sources
 
 
@@ -501,12 +557,15 @@ def decide_fetched(result: FetchResult, ref: dict[str, Any], category: str,
     return _decide_standard_file(SourceFile(name, data=result.data), category, provider)
 
 
-def decide_from_account(sources: dict[str, tuple[Connection, dict[str, Any]]], product: str, release: str,
-                        provider: LLMProvider | None) -> tuple[dict[str, Decision], dict[str, str]]:
-    """Decisions and external_source names for a release the account defines."""
+def decide_from_account(sources: dict[str, tuple[Connection | None, dict[str, Any]]], product: str, release: str,
+                        provider: LLMProvider | None, secrets: SecretStore | None = None
+                        ) -> tuple[dict[str, Decision], dict[str, str]]:
+    """Decisions and external_source names for a release the account defines. Tokens come from
+    `secrets` (a company's), else from the server's configured store (pod-test)."""
     deadline = time.monotonic() + CONNECTOR_SECONDS
     budget = ByteBudget(CONNECTOR_BUDGET_BYTES)
-    secrets = get_secret_store()
+    if secrets is None:
+        secrets = get_secret_store()
     decisions: dict[str, Decision] = {}
     names: dict[str, str] = {}
     for category in EXPECTED_FILES:
@@ -515,6 +574,11 @@ def decide_from_account(sources: dict[str, tuple[Connection, dict[str, Any]]], p
             names[category] = UNCONFIGURED_SOURCE
             continue
         conn, ref = sources[category]
+        if conn is None or conn.type not in REGISTRY:
+            names[category] = UNCONFIGURED_SOURCE
+            decisions[category] = Decision("INACCESSIBLE", _pinned_name(ref),
+                                           detail="The connection for this category no longer exists.")
+            continue
         connector = REGISTRY[conn.type]
         names[category] = connector.display_name
         try:
@@ -548,7 +612,7 @@ def list_fixture_files(product: str, release: str) -> list[SourceFile] | None:
     return files
 
 
-def retrieve_and_classify(bundle):
+def retrieve_and_classify(bundle, company: CompanyAccount | None = None):
     product = bundle["product_id"]
     release = bundle["release_version"]
 
@@ -558,8 +622,18 @@ def retrieve_and_classify(bundle):
         bundle["status"] = "FAILED"
         return bundle
 
-    account = account_sources(ACCOUNT, product, release)
-    if account is not None:
+    if company is not None:
+        # A company's bundle comes only from its own account: never from pod-test or our fixtures
+        resolved = account_sources(company, product, release)
+        if resolved is None:
+            bundle["error"] = f"No documents found for {product} {release}"
+            bundle["status"] = "FAILED"
+            return bundle
+        provider = get_provider()
+        if provider is not None:
+            provider = CappedProvider(provider, company.org_id)
+        decisions, sources = decide_from_account(resolved, product, release, provider, secrets=company.secrets)
+    elif (account := account_sources(ACCOUNT, product, release)) is not None:
         decisions, sources = decide_from_account(account, product, release, get_provider())
     else:
         files = list_fixture_files(product, release)

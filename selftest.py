@@ -53,13 +53,15 @@ def error(message, status):
 
 def list_fixtures():
     """Every release this system can serve: the fixtures/ folders and the pod-test account's
-    releases (test_account.json), each once, sorted."""
+    releases (test_account.json), each once, sorted. Empty when the fixtures folder is missing,
+    since most shared releases and the account's own fixture pins live there (spec: setup 500)."""
     root = artifact_pipeline.FIXTURES_ROOT
+    if not root.is_dir():
+        return []
     releases = set(artifact_pipeline.ACCOUNT.releases)
-    if root.is_dir():
-        releases |= {(product.name, release.name)
-                     for product in root.iterdir() if product.is_dir()
-                     for release in product.iterdir() if release.is_dir()}
+    releases |= {(product.name, release.name)
+                 for product in root.iterdir() if product.is_dir()
+                 for release in product.iterdir() if release.is_dir()}
     return [{"product_id": product, "release_version": release} for product, release in sorted(releases)]
 
 

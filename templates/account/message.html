@@ -1,0 +1,7 @@
+{% extends "account/base.html" %}
+{% block content %}
+<p>{{ message }}</p>
+{% if sign_in %}
+<p><a class="button" href="{{ url_for('auth.login') }}">Sign in</a></p>
+{% endif %}
+{% endblock %}

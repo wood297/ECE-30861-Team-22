@@ -1,0 +1,91 @@
+{% extends "account/base.html" %}
+{% block content %}
+<h2>Members</h2>
+<table>
+  <tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th>{% if is_admin %}<th></th>{% endif %}</tr>
+  {% for p in people %}
+  <tr>
+    <td>{{ p.name or "Unknown" }}{% if p.you %} <span class="muted">(you)</span>{% endif %}</td>
+    <td>{{ p.email }}</td>
+    <td>
+      {% if is_admin %}
+      <form method="post" action="{{ url_for('account.set_role', sub=p.sub) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <select name="role" aria-label="Role">
+          <option value="admin" {% if p.role == "admin" %}selected{% endif %}>admin</option>
+          <option value="member" {% if p.role == "member" %}selected{% endif %}>member</option>
+        </select>
+        <button type="submit">Save</button>
+      </form>
+      {% else %}{{ p.role }}{% endif %}
+    </td>
+    <td>{{ p.joined }}</td>
+    {% if is_admin %}
+    <td>
+      {% if not p.you %}
+      <form method="post" action="{{ url_for('account.remove_member', sub=p.sub) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="danger" type="submit">Remove</button>
+      </form>
+      {% endif %}
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+</table>
+
+{% if is_admin %}
+<h2>Invite someone</h2>
+<form class="block" method="post" action="{{ url_for('account.invite') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Email <input type="email" name="email" maxlength="254" required></label>
+  <label>Role
+    <select name="role"><option value="member">member</option><option value="admin">admin</option></select>
+  </label>
+  <button type="submit">Invite</button>
+</form>
+<p class="muted">They'll see the invite when they sign in with that email. We don't send email.
+  At most {{ max_members }} people, counting pending invites.</p>
+
+{% if invites %}
+<h2>Pending invites</h2>
+<table>
+  <tr><th>Email</th><th>Role</th><th>Expires</th><th></th></tr>
+  {% for i in invites %}
+  <tr>
+    <td>{{ i.email }}</td><td>{{ i.role }}</td><td>{{ date(i.expires_at) }}</td>
+    <td>
+      <form method="post" action="{{ url_for('account.cancel_invite') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="email" value="{{ i.email }}">
+        <button type="submit">Withdraw</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>Organization</h2>
+<form class="block" method="post" action="{{ url_for('account.rename_org') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Name <input name="name" maxlength="100" value="{{ g.org.name }}" required></label>
+  <button type="submit">Rename</button>
+</form>
+
+<h2>Delete this organization</h2>
+<p class="muted">Deletes its connections and their tokens, products, releases, members, invites and
+  bundles. It can't be undone.</p>
+<form class="block" method="post" action="{{ url_for('account.delete_org') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Type its name, <strong>{{ g.org.name }}</strong>, to confirm
+    <input name="confirm_name" maxlength="100" autocomplete="off" required></label>
+  <button class="danger" type="submit">Delete organization</button>
+</form>
+{% endif %}
+
+<form class="block" method="post" action="{{ url_for('account.leave') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="danger" type="submit">Leave {{ g.org.name }}</button>
+</form>
+{% endblock %}

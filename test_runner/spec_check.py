@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]  # PyYAML ships no type stubs
 from openapi_schema_validator import OAS30Validator, oas30_format_checker
 
 from test_runner.client import HttpClient
@@ -229,7 +229,8 @@ class Checker:
             files = {}
             if archive is not None and archive.status == 200 and zipfile.is_zipfile(io.BytesIO(archive.body)):
                 with zipfile.ZipFile(io.BytesIO(archive.body)) as zipped:
-                    files = {n.rsplit("/", 1)[-1]: hashlib.sha256(zipped.read(n)).hexdigest() for n in zipped.namelist()}
+                    files = {n.rsplit("/", 1)[-1]: hashlib.sha256(zipped.read(n)).hexdigest()
+                             for n in zipped.namelist()}
             for filename, digest in row.sha256.items():
                 self.record(f"{name}: {filename} bytes match the spec's sha256", files.get(filename) == digest,
                             "" if files.get(filename) == digest else f"got {files.get(filename) or 'no file'}")
@@ -254,7 +255,8 @@ def main(argv: list[str] | None = None) -> int:
     results = Checker(HttpClient(args.url, timeout=15), spec, poll_seconds=args.poll).run()
     print(f"{args.url} against spec.yaml {spec['info']['version']}\n")
     for check in results:
-        print(f"[{'PASS' if check.ok else 'FAIL'}] {check.name}" + (f"  ({check.detail})" if check.detail and not check.ok else ""))
+        detail = f"  ({check.detail})" if check.detail and not check.ok else ""
+        print(f"[{'PASS' if check.ok else 'FAIL'}] {check.name}{detail}")
     failed = sum(not check.ok for check in results)
     print(f"\n{len(results) - failed}/{len(results)} checks pass")
     return 0 if not failed else 1

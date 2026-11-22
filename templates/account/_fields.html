@@ -1,0 +1,24 @@
+{# Form inputs generated from a connector's Field list (connectors/base.py). Secrets are never
+   pre-filled: a stored token can be replaced but not shown. #}
+{% macro fields(field_list, values, secret_note="") %}
+{% for f in field_list %}
+<p>
+  <label>{{ f.label }}{% if not f.required %} <span class="muted">(optional)</span>{% endif %}<br>
+  {% if f.kind == "secret" %}
+    <input type="password" name="{{ f.name }}" autocomplete="new-password" spellcheck="false" size="50"
+           {% if not secret_note %}required{% endif %}>
+    {% if secret_note %}<br><span class="muted">{{ secret_note }}</span>{% endif %}
+  {% elif f.kind == "list" %}
+    <textarea name="{{ f.name }}" rows="3" cols="60" spellcheck="false">{{ values.get(f.name, "") }}</textarea>
+    <br><span class="muted">One per line, tried in order (at most {{ f.max_items }}).</span>
+  {% else %}
+    <input name="{{ f.name }}" value="{{ values.get(f.name, '') }}" size="50" spellcheck="false"
+           {% if f.kind == "url" %}type="url" placeholder="https://"{% endif %}
+           {% if f.kind == "integer" %}inputmode="numeric"{% endif %}
+           maxlength="{{ f.max_length }}" {% if f.required %}required{% endif %}>
+  {% endif %}
+  </label>
+  {% if f.help %}<br><span class="muted">{{ f.help }}</span>{% endif %}
+</p>
+{% endfor %}
+{% endmacro %}

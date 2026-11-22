@@ -1,6 +1,6 @@
 # CRA Documentation Aggregation System
 
-**ECE 30861 — Team 22 | Phase 4**
+**ECE 30861 — Team 22 | Phase 5**
 
 ## Overview
 
@@ -17,17 +17,17 @@ Given a product ID and release version, the system processes available documenta
 
 ## System Architecture
 
-The Phase 4 system consists of the following components:
+The Phase 5 system consists of the following integrated components:
 
 | Component | Function |
 |---|---|
 | Flask API | Handles documentation requests and exposes processing results |
-| Connectors | `connectors/`: Jenkins, GitHub, Confluence and the local fixtures folder, behind one contract (`CONNECTORS.md`). The pod-test account, `test_account.json`, pins each category of a release to one file in one connection: e.g. `prd-88 v1.5-jenkins` takes Test Logs from a pinned build on Team 24's Jenkins, and `v1.6-all-sources` uses all four sources. Tokens come from SSM on the server (`CRA_SECRET_PREFIX`) or a local file (`CRA_LOCAL_SECRETS`), never the repo. Check the pins live with `python -m connectors.account_live_check` |
-| GitHub Connector (Phase 4) | Connected through `source_catalog.json`: a category can point at one file in a GitHub repository at a pinned commit. Used for the pod's source-failure fixture (`prd-88 v1.2-github-inaccessible`, Test Logs) |
+| Connectors | `connectors/`: Jenkins, GitHub, Confluence, and local fixtures, implemented behind a shared connector contract (`CONNECTORS.md`). The pod-test account, `test_account.json`, maps each documentation category for a product release to a configured source. For example, `prd-88 v1.5-jenkins` retrieves Test Logs from a pinned Jenkins build, while `v1.6-all-sources` uses all four sources. Credentials are retrieved from AWS SSM (`CRA_SECRET_PREFIX`) or a local secrets file (`CRA_LOCAL_SECRETS`), rather than stored in the repository. Live source verification is available through `python -m connectors.account_live_check`. |
+| GitHub Connector (Phase 5) | Retrieves documentation artifacts from GitHub repositories using the shared connector framework. Supports pinned commit SHAs, configurable artifact paths, secure token retrieval through the secret store, and standardized error handling. Includes automated tests and live GitHub verification. |
 | Format Validator | Validates Markdown, HTML, and CycloneDX JSON/XML |
 | Bedrock Classifier | Uses `openai.gpt-oss-20b` on AWS Bedrock to classify documents with a non-standard name or without the proper heading |
-| Bundle Generator | Creates the documentation manifest and ZIP bundle |
-| Automated Tests | Verify functionality, error handling, and API behavior |
+| Bundle Generator | Creates documentation manifests and downloadable ZIP bundles containing retrieved artifacts |
+| Automated Tests | Verify connector functionality, artifact retrieval, classification, error handling, aggregation, bundle generation, and API behavior |
 
 **Processing workflow:**
 
@@ -35,27 +35,39 @@ The Phase 4 system consists of the following components:
 User Request (Product ID + Release)
                 |
                 v
-            Flask API
+             Flask API
                 |
                 v
-         Local Fixtures
+      Shared Connector Framework
+                |
+       +--------+--------+--------+
+       |        |        |        |
+       v        v        v        v
+     GitHub  Confluence Jenkins Local Fixtures
+       |        |        |        |
+       +--------+--------+--------+
                 |
                 v
-         Format Validation
+       Artifact Aggregation
                 |
                 v
-    Heading Rules, then Bedrock if needed
+        Format Validation
+                |
+                v
+    Heading Rules / Bedrock Classification
                 |
                 v
        Manifest Generation
                 |
                 v
-        Downloadable ZIP
+        Downloadable ZIP Bundle
 ```
 
 ## Document Classification
 
-Files are read from:
+Documentation artifacts are retrieved through the shared connector framework from GitHub, Confluence, Jenkins, or local fixtures, depending on the product and release configuration in `test_account.json`.
+
+Local documentation fixtures are stored at:
 
 ```text
 fixtures/{product_id}/{release_version}/
@@ -80,64 +92,60 @@ The intended deployed workflow allows users to access the service through a web 
 
 The exact API endpoints and response schemas are defined in the team's OpenAPI specification.
 
+
 ## Testing
 
-Automated tests cover GitHub retrieval, supported file formats, classification behavior, error handling, deployment checks, and processing logic. Run them with `python -m pytest`. They use fake responses and need no credentials.
+The project includes automated unit, integration, and connector tests covering the shared connector framework, external artifact retrieval, supported file formats, document classification, error handling, aggregation, and bundle generation.
 
-Live checks are separate and call the real model: `bedrock_live_check.py` and `bedrock_accuracy.py`. On 32 labelled documents run 3 times each, no wrong document was accepted in 96 answers, and 2 calls returned malformed replies. The set is small and written by the team, so it shows the approach works, not how it will do on every real document.
+GitHub connector tests verify pinned commit retrieval, authentication handling, candidate artifact paths, missing files, and upstream errors. Confluence and Jenkins connectors are also tested through the shared connector interface.
+
+The automated test suite can be run using:
+
+```bash
+python -m pytest
+```
+
+Tests use mocked responses where appropriate and do not require live external credentials.
+
+Live verification scripts are available for checking configured external connections and source retrieval. These include `connectors.account_live_check` and the GitHub-specific verification instructions in `GITHUB_LIVE_TEST.md`.
+
+The Bedrock classification approach was evaluated using 32 labelled documents across three runs. No incorrect document was accepted in 96 answers, although two calls returned malformed responses. This dataset is relatively small and team-generated, so results should not be interpreted as a guarantee of performance on all real-world documents.
+
+The team also ran the integrated test suite following connector and bundle pipeline integration, with all reported test cases passing.
 
 ## Known Limitations
 
-- The running service reads from local fixtures, except categories listed in `source_catalog.json`. Today that's one GitHub entry, which exists to test source failure (AC-05). Retrieving real releases from GitHub is planned for Phase 5. GitHub reads are anonymous unless `GITHUB_TOKEN` is set (60 requests/hour per IP; results for a pinned commit are cached).
+- External documentation retrieval is supported through the GitHub, Confluence, and Jenkins connectors, alongside local fixtures. Availability depends on valid source configuration, access permissions, network connectivity, and the availability of external services. Missing or inaccessible artifacts are reported through the connector and bundle status handling.
 - CycloneDX validation does not provide full schema certification.
 - Bedrock access depends on external service availability and our account's limits.
 - Deployment uses a stored, tightly scoped AWS key, because our AWS organization's policy doesn't allow GitHub's OIDC sign-in.
 
-## GitHub connector setup
+## GitHub Connector Setup (Phase 5)
 
-The running service uses the connector only for entries in `source_catalog.json`, and reads public repositories anonymously. The token setup below is for the separate access check, and for private repositories later.
+The Phase 5 GitHub connector is implemented in `connectors/github.py` and follows the shared connector interface defined in `CONNECTORS.md`.
 
-This increment provides a reusable read-only GitHub client and a local verification
-command. It authenticates a server-side personal access token through `GET /user`,
-then checks the configured repository through `GET /repos/{owner}/{repo}`. It does
-not retrieve artifacts or change the shared bundle API. Authentication is optional
-for starting the existing API; only the verification command requires configuration.
+The connector supports:
 
-Create a fine-grained personal access token in GitHub Settings > Developer settings >
-Personal access tokens. Select the correct resource owner, restrict repository access
-to the intended repository, and set an expiration. Repository Metadata read access
-is sufficient for this check. Organization approval or SSO policies may also apply.
-Later artifact retrieval will need its own permission review, such as Contents read;
-a successful metadata check does not prove that file downloads are authorized.
+- Read-only retrieval of documentation artifacts from GitHub repositories.
+- Pinned 40-character commit SHAs for reproducible retrieval.
+- Configurable candidate artifact paths.
+- Secure authentication through the shared secret store.
+- Controlled GitHub API requests using the shared HTTP client.
+- Standardized handling of missing artifacts, authentication failures, rate limits, and source errors.
 
-In PowerShell, set the repository and enter the token without displaying it:
+Connector configuration specifies the GitHub repository, pinned revision, and candidate artifact paths. Authentication tokens are retrieved through the connector context rather than embedded in source code.
 
-```powershell
-$env:GITHUB_REPOSITORY = 'wood297/ECE-30861-Team-22'
-$githubSecret = Read-Host 'GitHub token' -AsSecureString
-$env:GITHUB_TOKEN = [System.Net.NetworkCredential]::new('', $githubSecret).Password
-python -m github_auth_check
-Remove-Item Env:GITHUB_TOKEN
-```
+### Verification and Testing
 
-The command outputs JSON and exits with 0 on success or 1 on failure. Success example:
+Automated GitHub connector tests are located in `tests/test_connector_github.py`.
 
-```json
-{"status": "connected", "user": "your-login", "repository": "wood297/ECE-30861-Team-22"}
-```
+Live verification is available through:
 
-Errors distinguish missing configuration, rejected credentials, denied permissions,
-unknown/inaccessible repositories, rate limits, timeouts, network failures, redirects,
-and malformed upstream responses. A 404 cannot distinguish a nonexistent repository
-from a private repository hidden from the token. Requests time out after 10 seconds;
-the client does not automatically retry. Credential values and upstream error bodies
-are excluded from diagnostic output. Keep tokens in environment variables, use the
-hosting platform's secret store for deployment, and never paste them into source code,
-chat, screenshots, or test fixtures. `.env.example` documents variable names only;
-`.env` files are ignored and are not automatically loaded by this implementation.
+`python -m connectors.github_live_check`
 
-Tests use fake HTTP responses and require neither credentials nor a live connection.
-Run the command above locally for the separate live authentication check.
+Detailed configuration and verification instructions are provided in `GITHUB_LIVE_TEST.md`.
+
+The connector is integrated with the shared connector framework and can be used by the aggregation pipeline to retrieve documentation for configured product releases.
 
 References:
 - https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api
