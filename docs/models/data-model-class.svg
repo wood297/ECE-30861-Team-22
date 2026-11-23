@@ -1,15 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 990 1130" width="990" height="1130" font-family="Helvetica, Arial, sans-serif">
-  <defs>
-    <marker id="open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
-      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#1d2530" stroke-width="1.3"/>
-    </marker>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1660" width="1400" height="1660" font-family="Helvetica, Arial, sans-serif">
+  <defs><marker id="open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9" fill="none" stroke="#1d2530" stroke-width="1.3"/></marker></defs>
   <style>
     .cls { fill: #ffffff; stroke: #1d2530; stroke-width: 1.4; }
     .div { stroke: #1d2530; stroke-width: 1.2; }
     .note { fill: #fbfaf3; stroke: #8a8f98; stroke-width: 1; }
     .e { stroke: #1d2530; stroke-width: 1.3; fill: none; }
     .dash { stroke: #8a8f98; stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+    .dep { stroke: #1d2530; stroke-width: 1.2; stroke-dasharray: 6 4; fill: none; }
     .name { font-size: 14px; font-weight: bold; fill: #1d2530; }
     .st { font-size: 11px; fill: #5b6675; }
     .a { font-family: Menlo, Consolas, monospace; font-size: 12px; fill: #1d2530; }
@@ -18,52 +15,55 @@
     .mul { font-size: 12px; fill: #1d2530; font-family: Menlo, Consolas, monospace; }
     .title { font-size: 15px; font-weight: bold; fill: #1d2530; }
     .ink { fill: #1d2530; }
-  </style>
-  <rect width="990" height="1130" fill="#ffffff"/>
-  <text class="title" x="24" y="28">Bundle data model · UML class diagram · as delivered (Phase 4)</text>
-  <g transform="translate(0,40)">
-<path class="note" d="M24,10 H300 L314,24 V101 H24 Z"/>
-<path class="note" d="M300,10 V24 H314" fill="none"/>
-<text class="n" x="34" y="30">Storage: Python dictionaries in memory, cleared</text>
-<text class="n" x="34" y="45">on restart: bundles (app.py), archives</text>
-<text class="n" x="34" y="60">(bundle_service.py), _sessions (selftest.py),</text>
-<text class="n" x="34" y="75">_proposals and _github_cache</text>
-<text class="n" x="34" y="90">(artifact_pipeline.py).</text>
-<rect class="cls" x="340" y="10" width="300" height="132"/>
-<line class="div" x1="340" y1="40" x2="640" y2="40"/>
-<text class="name" x="490.0" y="30" text-anchor="middle">Bundle</text>
-<text class="a" x="352" y="58">bundle_id : UUID</text>
-<text class="a" x="352" y="76">product_id : str</text>
-<text class="a" x="352" y="94">release_version : str</text>
-<text class="a" x="352" y="112">status : BundleStatus</text>
-<text class="a" x="352" y="130">error : str [0..1]</text>
-<path class="note" d="M666,10 H952 L966,24 V101 H666 Z"/>
-<path class="note" d="M952,10 V24 H966" fill="none"/>
-<text class="n" x="676" y="30">{processed on a background thread:</text>
-<text class="n" x="676" y="45">status goes PENDING → PROCESSING →</text>
-<text class="n" x="676" y="60">COMPLETED, PARTIAL_SUCCESS or FAILED}</text>
-<text class="n" x="676" y="75">{the terminal status is set last, after</text>
-<text class="n" x="676" y="90">the manifest and archive are ready}</text>
-<line class="dash" x1="640" y1="60" x2="666" y2="60"/>
-<polygon class="ink" points="400,142 407,152 400,162 393,152"/>
-<polyline class="e" points="400,162 400,200 170,200 170,250"/>
-<text class="lbl" x="285" y="193" text-anchor="middle">records</text>
-<text class="mul" x="408" y="178">1</text>
-<text class="mul" x="162" y="242" text-anchor="end">0..4</text>
-<text class="lbl" x="178" y="242">manifest</text>
-<polygon class="ink" points="580,142 587,152 580,162 573,152"/>
-<polyline class="e" points="580,162 580,200 810,200 810,250"/>
-<text class="lbl" x="695" y="193" text-anchor="middle">contains</text>
-<text class="mul" x="588" y="178">1</text>
-<text class="mul" x="802" y="242" text-anchor="end">0..4</text>
-<text class="lbl" x="818" y="242">artifacts</text>
-<line class="e" x1="490" y1="142" x2="490" y2="248" marker-end="url(#open)"/>
-<text class="mul" x="498" y="158">1</text>
-<text class="lbl" x="498" y="198">packaged as</text>
-<text class="mul" x="498" y="242">0..1</text>
-<rect class="cls" x="20" y="250" width="300" height="168"/>
-<line class="div" x1="20" y1="280" x2="320" y2="280"/>
-<text class="name" x="170.0" y="270" text-anchor="middle">ManifestItem</text>
+</style>
+  <rect width="1400" height="1660" fill="#ffffff"/>
+<text class="title" x="24" y="28">Bundle and account data model · UML class diagram · as delivered (Phase 5)</text>
+<text class="st" x="1376" y="22" text-anchor="end">filled diamond: composition · open arrow: navigable association · dashed arrow: dependency</text>
+<text class="st" x="1376" y="36" text-anchor="end">{…}: constraint · notes in yellow · attributes as name : type [multiplicity]</text>
+<g transform="translate(0,40)">
+<path class="note" d="M24,10 H350 L364,24 V120 H24 Z"/>
+<path class="note" d="M350,10 V24 H364" fill="none"/>
+<text class="n" x="34" y="30">Storage: bundles, archives, test sessions and caches</text>
+<text class="n" x="34" y="45">live in memory (1 hour, capped) and are lost on</text>
+<text class="n" x="34" y="60">restart. Organizations and everything they own</text>
+<text class="n" x="34" y="75">are items in one DynamoDB table; tokens are SSM</text>
+<text class="n" x="34" y="90">SecureStrings. The pod-test account and the</text>
+<text class="n" x="34" y="105">source catalog are files in the repository.</text>
+<rect class="cls" x="400" y="10" width="300" height="132"/>
+<line class="div" x1="400" y1="40" x2="700" y2="40"/>
+<text class="name" x="550" y="30" text-anchor="middle">Bundle</text>
+<text class="a" x="412" y="58">bundle_id : UUID</text>
+<text class="a" x="412" y="76">product_id : str</text>
+<text class="a" x="412" y="94">release_version : str</text>
+<text class="a" x="412" y="112">status : BundleStatus</text>
+<text class="a" x="412" y="130">error : str [0..1]</text>
+<path class="note" d="M730,10 H996 L1010,24 V105 H730 Z"/>
+<path class="note" d="M996,10 V24 H1010" fill="none"/>
+<text class="n" x="740" y="30">{processed on a background thread:</text>
+<text class="n" x="740" y="45">PENDING → PROCESSING → COMPLETED,</text>
+<text class="n" x="740" y="60">PARTIAL_SUCCESS or FAILED}</text>
+<text class="n" x="740" y="75">{the terminal status is set last, after</text>
+<text class="n" x="740" y="90">the manifest and archive are ready}</text>
+<line class="dash" x1="700" y1="50" x2="730" y2="50"/>
+<polygon class="ink" points="450,152 443,162 450,172 457,162"/>
+<polyline class="e" points="450,172 450,200 190,200 190,250"/>
+<text class="lbl" x="320" y="193" text-anchor="middle">records</text>
+<text class="mul" x="458" y="186">1</text>
+<text class="mul" x="182" y="242" text-anchor="end">0..4</text>
+<text class="lbl" x="198" y="242">manifest</text>
+<polygon class="ink" points="650,152 643,162 650,172 657,162"/>
+<polyline class="e" points="650,172 650,200 865,200 865,250"/>
+<text class="lbl" x="757" y="193" text-anchor="middle">contains</text>
+<text class="mul" x="658" y="186">1</text>
+<text class="mul" x="857" y="242" text-anchor="end">0..4</text>
+<text class="lbl" x="873" y="242">artifacts</text>
+<polyline class="e" points="550,152 550,248" marker-end="url(#open)"/>
+<text class="mul" x="558" y="168">1</text>
+<text class="lbl" x="558" y="208">packaged as</text>
+<text class="mul" x="558" y="242">0..1</text>
+<rect class="cls" x="20" y="250" width="340" height="168"/>
+<line class="div" x1="20" y1="280" x2="360" y2="280"/>
+<text class="name" x="190" y="270" text-anchor="middle">ManifestItem</text>
 <text class="a" x="32" y="298">category : Category</text>
 <text class="a" x="32" y="316">status : CategoryStatus</text>
 <text class="a" x="32" y="334">external_source : str</text>
@@ -71,117 +71,293 @@
 <text class="a" x="32" y="370">source_file : str [0..1]</text>
 <text class="a" x="32" y="388">classified_by : ClassifiedBy [0..1]</text>
 <text class="a" x="32" y="406">classification_evidence : str [0..1]</text>
-<rect class="cls" x="350" y="250" width="280" height="78"/>
-<line class="div" x1="350" y1="280" x2="630" y2="280"/>
-<text class="name" x="490.0" y="270" text-anchor="middle">BundleArchive</text>
-<text class="a" x="362" y="298">filename : str</text>
-<text class="a" x="362" y="316">data : bytes (zip)</text>
-<rect class="cls" x="660" y="250" width="300" height="132"/>
-<line class="div" x1="660" y1="280" x2="960" y2="280"/>
-<text class="name" x="810.0" y="270" text-anchor="middle">Artifact</text>
-<text class="a" x="672" y="298">category : Category</text>
-<text class="a" x="672" y="316">product_id : str</text>
-<text class="a" x="672" y="334">release_version : str</text>
-<text class="a" x="672" y="352">source_file : str</text>
-<text class="a" x="672" y="370">content : str</text>
-<line class="dash" x1="170" y1="418" x2="170" y2="450"/>
-<path class="note" d="M20,450 H306 L320,464 V601 H20 Z"/>
-<path class="note" d="M306,450 V464 H320" fill="none"/>
-<text class="n" x="30" y="470">{exactly one item per Category;</text>
-<text class="n" x="30" y="485">none when Bundle.status = FAILED}</text>
-<text class="n" x="30" y="500">{external_source = "fixtures", or "GitHub"</text>
-<text class="n" x="30" y="515">when a SourceCatalogEntry configures it}</text>
-<text class="n" x="30" y="530">{source_failure_detail only for INVALID</text>
-<text class="n" x="30" y="545">and INACCESSIBLE}</text>
-<text class="n" x="30" y="560">{classified_by only when the rules or</text>
-<text class="n" x="30" y="575">Bedrock judged a readable file;</text>
-<text class="n" x="30" y="590">classification_evidence only for bedrock}</text>
-<line class="dash" x1="490" y1="328" x2="490" y2="360"/>
-<path class="note" d="M350,360 H616 L630,374 V481 H350 Z"/>
-<path class="note" d="M616,360 V374 H630" fill="none"/>
-<text class="n" x="360" y="380">{exists only for COMPLETED and</text>
-<text class="n" x="360" y="395">PARTIAL_SUCCESS}</text>
-<text class="n" x="360" y="410">{each PRESENT file unchanged, named</text>
-<text class="n" x="360" y="425">by its source_file, + manifest.json</text>
-<text class="n" x="360" y="440">without bundle_id}</text>
-<text class="n" x="360" y="455">{fixed timestamps: identical requests</text>
-<text class="n" x="360" y="470">give identical archives}</text>
-<line class="dash" x1="810" y1="382" x2="810" y2="410"/>
-<path class="note" d="M660,410 H946 L960,424 V501 H660 Z"/>
-<path class="note" d="M946,410 V424 H960" fill="none"/>
-<text class="n" x="670" y="430">{one Artifact per PRESENT item;</text>
-<text class="n" x="670" y="445">product_id and release_version equal</text>
-<text class="n" x="670" y="460">the Bundle's}</text>
-<text class="n" x="670" y="475">{content is the file's text, unmodified:</text>
-<text class="n" x="670" y="490">BOM and line endings kept}</text>
-<rect class="cls" x="20" y="650" width="300" height="148"/>
-<line class="div" x1="20" y1="696" x2="320" y2="696"/>
-<text class="st" x="170.0" y="666" text-anchor="middle">«config» source_catalog.json</text>
-<text class="name" x="170.0" y="684" text-anchor="middle">SourceCatalogEntry</text>
-<text class="a" x="32" y="714">source : "github"</text>
-<text class="a" x="32" y="732">repository : str</text>
-<text class="a" x="32" y="750">commit : str</text>
-<text class="a" x="32" y="768">path : str</text>
-<text class="a" x="32" y="786">format : str [0..1]</text>
-<line class="dash" x1="170" y1="798" x2="170" y2="816"/>
-<path class="note" d="M20,816 H306 L320,830 V907 H20 Z"/>
-<path class="note" d="M306,816 V830 H320" fill="none"/>
-<text class="n" x="30" y="836">{at most one per product_id/release_version</text>
-<text class="n" x="30" y="851">and Category; commit is a full 40-character</text>
-<text class="n" x="30" y="866">SHA, so results are repeatable}</text>
-<text class="n" x="30" y="881">{file not at the commit, or GitHub fails</text>
-<text class="n" x="30" y="896">→ that category is INACCESSIBLE}</text>
-<rect class="cls" x="350" y="650" width="280" height="112"/>
-<line class="div" x1="350" y1="696" x2="630" y2="696"/>
-<text class="st" x="490.0" y="666" text-anchor="middle">«cached» Bedrock answer</text>
-<text class="name" x="490.0" y="684" text-anchor="middle">ClassificationProposal</text>
-<text class="a" x="362" y="714">actual_category : Category [0..1]</text>
-<text class="a" x="362" y="732">evidence : str [0..1]</text>
-<text class="a" x="362" y="750">error_code : str [0..1]</text>
-<line class="dash" x1="490" y1="762" x2="490" y2="780"/>
-<path class="note" d="M350,780 H616 L630,794 V871 H350 Z"/>
-<path class="note" d="M616,780 V794 H630" fill="none"/>
-<text class="n" x="360" y="800">{cached by (content sha256, prompt</text>
-<text class="n" x="360" y="815">version, model); failures not cached}</text>
-<text class="n" x="360" y="830">{only a proposal: code sets every</text>
-<text class="n" x="360" y="845">status, and a failed or unclear answer</text>
-<text class="n" x="360" y="860">can never make a category PRESENT}</text>
-<rect class="cls" x="660" y="650" width="300" height="96"/>
-<line class="div" x1="660" y1="680" x2="960" y2="680"/>
-<text class="name" x="810.0" y="670" text-anchor="middle">TestSession</text>
-<text class="a" x="672" y="698">session_id : str</text>
-<text class="a" x="672" y="716">created_at : datetime</text>
-<text class="a" x="672" y="734">setup : object</text>
-<text class="st" x="810" y="762" text-anchor="middle">selftest.py · not linked to bundles</text>
-<rect class="cls" x="20" y="925" width="225" height="148"/>
-<line class="div" x1="20" y1="971" x2="245" y2="971"/>
-<text class="st" x="132.5" y="941" text-anchor="middle">«enumeration»</text>
-<text class="name" x="132.5" y="959" text-anchor="middle">BundleStatus</text>
-<text class="a" x="32" y="989">PENDING</text>
-<text class="a" x="32" y="1007">PROCESSING</text>
-<text class="a" x="32" y="1025">COMPLETED</text>
-<text class="a" x="32" y="1043">PARTIAL_SUCCESS</text>
-<text class="a" x="32" y="1061">FAILED</text>
-<rect class="cls" x="260" y="925" width="225" height="130"/>
-<line class="div" x1="260" y1="971" x2="485" y2="971"/>
-<text class="st" x="372.5" y="941" text-anchor="middle">«enumeration»</text>
-<text class="name" x="372.5" y="959" text-anchor="middle">CategoryStatus</text>
-<text class="a" x="272" y="989">PRESENT</text>
-<text class="a" x="272" y="1007">MISSING</text>
-<text class="a" x="272" y="1025">INVALID</text>
-<text class="a" x="272" y="1043">INACCESSIBLE</text>
-<rect class="cls" x="500" y="925" width="225" height="130"/>
-<line class="div" x1="500" y1="971" x2="725" y2="971"/>
-<text class="st" x="612.5" y="941" text-anchor="middle">«enumeration»</text>
-<text class="name" x="612.5" y="959" text-anchor="middle">Category</text>
-<text class="a" x="512" y="989">SBOM</text>
-<text class="a" x="512" y="1007">Risk Assessment</text>
-<text class="a" x="512" y="1025">Test Logs</text>
-<text class="a" x="512" y="1043">User Instructions</text>
-<rect class="cls" x="740" y="925" width="220" height="94"/>
-<line class="div" x1="740" y1="971" x2="960" y2="971"/>
-<text class="st" x="850.0" y="941" text-anchor="middle">«enumeration»</text>
-<text class="name" x="850.0" y="959" text-anchor="middle">ClassifiedBy</text>
-<text class="a" x="752" y="989">rules</text>
-<text class="a" x="752" y="1007">bedrock</text>
-</g></svg>
+<line class="dash" x1="190" y1="418" x2="190" y2="440"/>
+<path class="note" d="M20,440 H346 L360,454 V610 H20 Z"/>
+<path class="note" d="M346,440 V454 H360" fill="none"/>
+<text class="n" x="30" y="460">{exactly one item per Category;</text>
+<text class="n" x="30" y="475">none when Bundle.status = FAILED}</text>
+<text class="n" x="30" y="490">{external_source: fixtures, or GitHub when</text>
+<text class="n" x="30" y="505">source_catalog.json names it; for an account</text>
+<text class="n" x="30" y="520">release the connector's name (fixtures, GitHub,</text>
+<text class="n" x="30" y="535">Confluence, Jenkins), or none when no source</text>
+<text class="n" x="30" y="550">is configured for the category}</text>
+<text class="n" x="30" y="565">{source_failure_detail only for INVALID and</text>
+<text class="n" x="30" y="580">INACCESSIBLE; classification_evidence only</text>
+<text class="n" x="30" y="595">when classified_by = bedrock}</text>
+<rect class="cls" x="400" y="250" width="300" height="78"/>
+<line class="div" x1="400" y1="280" x2="700" y2="280"/>
+<text class="name" x="550" y="270" text-anchor="middle">BundleArchive</text>
+<text class="a" x="412" y="298">filename : str</text>
+<text class="a" x="412" y="316">data : bytes (zip)</text>
+<line class="dash" x1="550" y1="328" x2="550" y2="350"/>
+<path class="note" d="M400,350 H686 L700,364 V490 H400 Z"/>
+<path class="note" d="M686,350 V364 H700" fill="none"/>
+<text class="n" x="410" y="370">{exists only for COMPLETED and</text>
+<text class="n" x="410" y="385">PARTIAL_SUCCESS}</text>
+<text class="n" x="410" y="400">{each PRESENT file unchanged under its</text>
+<text class="n" x="410" y="415">source_file; a repeated name goes under</text>
+<text class="n" x="410" y="430">&lt;category&gt;/; + manifest.json without</text>
+<text class="n" x="410" y="445">bundle_id}</text>
+<text class="n" x="410" y="460">{fixed timestamps: identical requests</text>
+<text class="n" x="410" y="475">give identical archives}</text>
+<rect class="cls" x="730" y="250" width="280" height="132"/>
+<line class="div" x1="730" y1="280" x2="1010" y2="280"/>
+<text class="name" x="870" y="270" text-anchor="middle">Artifact</text>
+<text class="a" x="742" y="298">category : Category</text>
+<text class="a" x="742" y="316">product_id : str</text>
+<text class="a" x="742" y="334">release_version : str</text>
+<text class="a" x="742" y="352">source_file : str</text>
+<text class="a" x="742" y="370">content : str</text>
+<line class="dash" x1="870" y1="382" x2="870" y2="404"/>
+<path class="note" d="M730,404 H996 L1010,418 V499 H730 Z"/>
+<path class="note" d="M996,404 V418 H1010" fill="none"/>
+<text class="n" x="740" y="424">{one Artifact per PRESENT item;</text>
+<text class="n" x="740" y="439">product_id and release_version</text>
+<text class="n" x="740" y="454">equal the Bundle's}</text>
+<text class="n" x="740" y="469">{content is the file's text, unmodified:</text>
+<text class="n" x="740" y="484">BOM and line endings kept}</text>
+<rect class="cls" x="1060" y="10" width="320" height="112"/>
+<line class="div" x1="1060" y1="56" x2="1380" y2="56"/>
+<text class="st" x="1220" y="26" text-anchor="middle">«cached» Bedrock answer</text>
+<text class="name" x="1220" y="44" text-anchor="middle">ClassificationProposal</text>
+<text class="a" x="1072" y="74">actual_category : Category [0..1]</text>
+<text class="a" x="1072" y="92">evidence : str [0..1]</text>
+<text class="a" x="1072" y="110">error_code : str [0..1]</text>
+<line class="dash" x1="1220" y1="122" x2="1220" y2="140"/>
+<path class="note" d="M1060,140 H1366 L1380,154 V235 H1060 Z"/>
+<path class="note" d="M1366,140 V154 H1380" fill="none"/>
+<text class="n" x="1070" y="160">{cached by (content sha256, prompt version,</text>
+<text class="n" x="1070" y="175">model); failures are not cached}</text>
+<text class="n" x="1070" y="190">{only a proposal: code sets every status, and a</text>
+<text class="n" x="1070" y="205">failed or unclear answer never gives PRESENT}</text>
+<text class="n" x="1070" y="220">{a company: at most 200 Bedrock calls a day}</text>
+<rect class="cls" x="1060" y="270" width="320" height="96"/>
+<line class="div" x1="1060" y1="300" x2="1380" y2="300"/>
+<text class="name" x="1220" y="290" text-anchor="middle">TestSession</text>
+<text class="a" x="1072" y="318">session_id : str</text>
+<text class="a" x="1072" y="336">created_at : datetime</text>
+<text class="a" x="1072" y="354">setup : object</text>
+<text class="st" x="1220" y="380" text-anchor="middle">selftest.py · not linked to bundles</text>
+<rect class="cls" x="1060" y="410" width="320" height="148"/>
+<line class="div" x1="1060" y1="456" x2="1380" y2="456"/>
+<text class="st" x="1220" y="426" text-anchor="middle">«config» source_catalog.json</text>
+<text class="name" x="1220" y="444" text-anchor="middle">SourceCatalogEntry</text>
+<text class="a" x="1072" y="474">source : "github"</text>
+<text class="a" x="1072" y="492">repository : str</text>
+<text class="a" x="1072" y="510">commit : str</text>
+<text class="a" x="1072" y="528">path : str</text>
+<text class="a" x="1072" y="546">format : str [0..1]</text>
+<line class="dash" x1="1220" y1="568" x2="1220" y2="586"/>
+<path class="note" d="M1060,586 H1366 L1380,600 V681 H1060 Z"/>
+<path class="note" d="M1366,586 V600 H1380" fill="none"/>
+<text class="n" x="1070" y="606">{used only for pod-test releases with no account</text>
+<text class="n" x="1070" y="621">entry; at most one per release and Category;</text>
+<text class="n" x="1070" y="636">commit is a full 40-character SHA}</text>
+<text class="n" x="1070" y="651">{file not at the commit, or GitHub fails</text>
+<text class="n" x="1070" y="666">→ that category is INACCESSIBLE}</text>
+<polyline class="e" points="700,130 1035,130 1035,760 862,760" marker-end="url(#open)"/>
+<text class="mul" x="708" y="124">0..*</text>
+<text class="lbl" x="870" y="124">owner</text>
+<text class="mul" x="870" y="754">0..1</text>
+<path class="note" d="M560,590 H846 L860,604 V670 H560 Z"/>
+<path class="note" d="M846,590 V604 H860" fill="none"/>
+<text class="n" x="570" y="610">{created by a signed-in person (at most 3);</text>
+<text class="n" x="570" y="625">members + invites ≤ 25; at least one admin}</text>
+<text class="n" x="570" y="640">{a company's bundles are readable only by its</text>
+<text class="n" x="570" y="655">members; pod-test bundles have no owner}</text>
+<line class="dash" x1="710" y1="670" x2="710" y2="700"/>
+<rect class="cls" x="560" y="700" width="300" height="114"/>
+<line class="div" x1="560" y1="730" x2="860" y2="730"/>
+<text class="name" x="710" y="720" text-anchor="middle">Organization</text>
+<text class="a" x="572" y="748">org_id : UUID</text>
+<text class="a" x="572" y="766">name : str</text>
+<text class="a" x="572" y="784">created_by : str</text>
+<text class="a" x="572" y="802">created_at : int</text>
+<rect class="cls" x="20" y="690" width="290" height="96"/>
+<line class="div" x1="20" y1="720" x2="310" y2="720"/>
+<text class="name" x="165" y="710" text-anchor="middle">Membership</text>
+<text class="a" x="32" y="738">sub : str</text>
+<text class="a" x="32" y="756">role : Role</text>
+<text class="a" x="32" y="774">joined_at : int</text>
+<polygon class="ink" points="560,730 550,723 540,730 550,737"/>
+<polyline class="e" points="540,730 312,730"/>
+<text class="mul" x="548" y="722" text-anchor="end">1</text>
+<text class="mul" x="320" y="722">1..25</text>
+<text class="lbl" x="440" y="748" text-anchor="middle">members</text>
+<rect class="cls" x="20" y="830" width="290" height="114"/>
+<line class="div" x1="20" y1="860" x2="310" y2="860"/>
+<text class="name" x="165" y="850" text-anchor="middle">Invite</text>
+<text class="a" x="32" y="878">email : str</text>
+<text class="a" x="32" y="896">role : Role</text>
+<text class="a" x="32" y="914">invited_by : str</text>
+<text class="a" x="32" y="932">expires_at : int</text>
+<polygon class="ink" points="560,790 550,783 540,790 550,797"/>
+<polyline class="e" points="540,790 440,790 440,880 312,880"/>
+<text class="mul" x="548" y="782" text-anchor="end">1</text>
+<text class="mul" x="320" y="872">0..24</text>
+<text class="lbl" x="448" y="840">invites</text>
+<line class="dash" x1="165" y1="944" x2="165" y2="960"/>
+<path class="note" d="M20,960 H296 L310,974 V1010 H20 Z"/>
+<path class="note" d="M296,960 V974 H310" fill="none"/>
+<text class="n" x="30" y="980">{an invite lasts 7 days; only its email</text>
+<text class="n" x="30" y="995">address can accept it}</text>
+<rect class="cls" x="1060" y="760" width="320" height="150"/>
+<line class="div" x1="1060" y1="790" x2="1380" y2="790"/>
+<text class="name" x="1220" y="780" text-anchor="middle">Connection</text>
+<text class="a" x="1072" y="808">conn_id : UUID</text>
+<text class="a" x="1072" y="826">type : ConnectorType</text>
+<text class="a" x="1072" y="844">settings : dict</text>
+<text class="a" x="1072" y="862">status : ConnectionStatus</text>
+<text class="a" x="1072" y="880">secret_path : str [0..1]</text>
+<text class="a" x="1072" y="898">created_at : int</text>
+<polygon class="ink" points="860,790 870,797 880,790 870,783"/>
+<polyline class="e" points="880,790 1058,790"/>
+<text class="mul" x="872" y="808">1</text>
+<text class="mul" x="1052" y="808" text-anchor="end">0..10</text>
+<text class="lbl" x="965" y="784" text-anchor="middle">connections</text>
+<polyline class="e" points="1220,910 1220,958" marker-end="url(#open)"/>
+<text class="mul" x="1228" y="926">1</text>
+<text class="lbl" x="1228" y="940">token</text>
+<text class="mul" x="1212" y="952" text-anchor="end">0..1</text>
+<rect class="cls" x="1060" y="960" width="320" height="94"/>
+<line class="div" x1="1060" y1="1006" x2="1380" y2="1006"/>
+<text class="st" x="1220" y="976" text-anchor="middle">«SSM SecureString»</text>
+<text class="name" x="1220" y="994" text-anchor="middle">ConnectionToken</text>
+<text class="a" x="1072" y="1024">path : str</text>
+<text class="a" x="1072" y="1042">value : str {secret}</text>
+<line class="dash" x1="1220" y1="1054" x2="1220" y2="1066"/>
+<path class="note" d="M1060,1066 H1366 L1380,1080 V1116 H1060 Z"/>
+<path class="note" d="M1366,1066 V1080 H1380" fill="none"/>
+<text class="n" x="1070" y="1086">{path = /team22-cra/orgs/&lt;org_id&gt;/conn/&lt;conn_id&gt;;</text>
+<text class="n" x="1070" y="1101">never in DynamoDB, a file or a response}</text>
+<polygon class="ink" points="600,814 593,824 600,834 607,824"/>
+<polyline class="e" points="600,834 600,898"/>
+<text class="mul" x="592" y="846" text-anchor="end">1</text>
+<text class="mul" x="592" y="892" text-anchor="end">0..50</text>
+<text class="lbl" x="608" y="870">products</text>
+<rect class="cls" x="560" y="900" width="300" height="60"/>
+<line class="div" x1="560" y1="930" x2="860" y2="930"/>
+<text class="name" x="710" y="920" text-anchor="middle">Product</text>
+<text class="a" x="572" y="948">product_id : str</text>
+<polygon class="ink" points="600,960 593,970 600,980 607,970"/>
+<polyline class="e" points="600,980 600,1038"/>
+<text class="mul" x="592" y="992" text-anchor="end">1</text>
+<text class="mul" x="592" y="1032" text-anchor="end">0..200</text>
+<text class="lbl" x="608" y="1012">releases</text>
+<rect class="cls" x="560" y="1040" width="300" height="60"/>
+<line class="div" x1="560" y1="1070" x2="860" y2="1070"/>
+<text class="name" x="710" y="1060" text-anchor="middle">Release</text>
+<text class="a" x="572" y="1088">release : str</text>
+<rect class="cls" x="560" y="1170" width="300" height="94"/>
+<line class="div" x1="560" y1="1216" x2="860" y2="1216"/>
+<text class="st" x="710" y="1186" text-anchor="middle">«data type»</text>
+<text class="name" x="710" y="1204" text-anchor="middle">SourceRef</text>
+<text class="a" x="572" y="1234">conn : conn_id</text>
+<text class="a" x="572" y="1252">fields : connector-specific</text>
+<polyline class="e" points="560,930 530,930 530,1230 558,1230" marker-end="url(#open)"/>
+<text class="lbl" x="522" y="1080" text-anchor="end">rules</text>
+<text class="mul" x="552" y="1248" text-anchor="end">0..4</text>
+<polyline class="e" points="710,1100 710,1168" marker-end="url(#open)"/>
+<text class="lbl" x="718" y="1130">pins</text>
+<text class="mul" x="718" y="1162">0..4</text>
+<line class="dash" x1="710" y1="1264" x2="710" y2="1280"/>
+<path class="note" d="M560,1280 H846 L860,1294 V1390 H560 Z"/>
+<path class="note" d="M846,1280 V1294 H860" fill="none"/>
+<text class="n" x="570" y="1300">{at most one per Category; a release's pin wins</text>
+<text class="n" x="570" y="1315">over its product's rule; {product} and {release}</text>
+<text class="n" x="570" y="1330">in a rule are filled in}</text>
+<text class="n" x="570" y="1345">fields: fixtures paths · GitHub revision, paths ·</text>
+<text class="n" x="570" y="1360">Confluence page_id, filename, version ·</text>
+<text class="n" x="570" y="1375">Jenkins job, build, paths</text>
+<polyline class="e" points="862,1200 1000,1200 1000,835 1058,835" marker-end="url(#open)"/>
+<text class="lbl" x="1008" y="1020">uses</text>
+<text class="mul" x="870" y="1194">*</text>
+<text class="mul" x="1052" y="829" text-anchor="end">1</text>
+<polyline class="dep" points="862,1250 1058,1250" marker-end="url(#open)"/>
+<text class="lbl" x="960" y="1244" text-anchor="middle">«fetched as»</text>
+<rect class="cls" x="1060" y="1170" width="320" height="148"/>
+<line class="div" x1="1060" y1="1216" x2="1380" y2="1216"/>
+<text class="st" x="1220" y="1186" text-anchor="middle">«transient»</text>
+<text class="name" x="1220" y="1204" text-anchor="middle">FetchResult</text>
+<text class="a" x="1072" y="1234">outcome : FetchOutcome</text>
+<text class="a" x="1072" y="1252">data : bytes [0..1]</text>
+<text class="a" x="1072" y="1270">filename : str [0..1]</text>
+<text class="a" x="1072" y="1288">detail : str [0..1]</text>
+<text class="a" x="1072" y="1306">version : str [0..1]</text>
+<line class="dash" x1="1220" y1="1318" x2="1220" y2="1330"/>
+<path class="note" d="M1060,1330 H1366 L1380,1344 V1410 H1060 Z"/>
+<path class="note" d="M1366,1330 V1344 H1380" fill="none"/>
+<text class="n" x="1070" y="1350">{RETRIEVED goes through the same rules as a</text>
+<text class="n" x="1070" y="1365">fixture file; any other outcome makes the</text>
+<text class="n" x="1070" y="1380">category INACCESSIBLE with the detail}</text>
+<text class="n" x="1070" y="1395">{RETRIEVED and NOT_FOUND reused for 10 min}</text>
+<path class="note" d="M20,1040 H466 L480,1054 V1150 H20 Z"/>
+<path class="note" d="M466,1040 V1054 H480" fill="none"/>
+<text class="n" x="30" y="1060">The pod-test account (test_account.json, read by account_config.py</text>
+<text class="n" x="30" y="1075">as AccountConfig) is an organization kept in a file: org_id</text>
+<text class="n" x="30" y="1090">30653a13-…, name "pod-test", with Connections, Products and</text>
+<text class="n" x="30" y="1105">Releases of these same classes. Releases it defines are served</text>
+<text class="n" x="30" y="1120">from it first; its tokens are in SSM like a company's. It is</text>
+<text class="n" x="30" y="1135">never stored in DynamoDB.</text>
+<rect class="cls" x="20" y="1450" width="160" height="148"/>
+<line class="div" x1="20" y1="1496" x2="180" y2="1496"/>
+<text class="st" x="100" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="100" y="1484" text-anchor="middle">BundleStatus</text>
+<text class="a" x="32" y="1514">PENDING</text>
+<text class="a" x="32" y="1532">PROCESSING</text>
+<text class="a" x="32" y="1550">COMPLETED</text>
+<text class="a" x="32" y="1568">PARTIAL_SUCCESS</text>
+<text class="a" x="32" y="1586">FAILED</text>
+<rect class="cls" x="191" y="1450" width="160" height="130"/>
+<line class="div" x1="191" y1="1496" x2="351" y2="1496"/>
+<text class="st" x="271" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="271" y="1484" text-anchor="middle">CategoryStatus</text>
+<text class="a" x="203" y="1514">PRESENT</text>
+<text class="a" x="203" y="1532">MISSING</text>
+<text class="a" x="203" y="1550">INVALID</text>
+<text class="a" x="203" y="1568">INACCESSIBLE</text>
+<rect class="cls" x="362" y="1450" width="160" height="130"/>
+<line class="div" x1="362" y1="1496" x2="522" y2="1496"/>
+<text class="st" x="442" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="442" y="1484" text-anchor="middle">Category</text>
+<text class="a" x="374" y="1514">SBOM</text>
+<text class="a" x="374" y="1532">Risk Assessment</text>
+<text class="a" x="374" y="1550">Test Logs</text>
+<text class="a" x="374" y="1568">User Instructions</text>
+<rect class="cls" x="533" y="1450" width="160" height="94"/>
+<line class="div" x1="533" y1="1496" x2="693" y2="1496"/>
+<text class="st" x="613" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="613" y="1484" text-anchor="middle">ClassifiedBy</text>
+<text class="a" x="545" y="1514">rules</text>
+<text class="a" x="545" y="1532">bedrock</text>
+<rect class="cls" x="704" y="1450" width="160" height="148"/>
+<line class="div" x1="704" y1="1496" x2="864" y2="1496"/>
+<text class="st" x="784" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="784" y="1484" text-anchor="middle">FetchOutcome</text>
+<text class="a" x="716" y="1514">RETRIEVED</text>
+<text class="a" x="716" y="1532">NOT_FOUND</text>
+<text class="a" x="716" y="1550">AUTH_FAILED</text>
+<text class="a" x="716" y="1568">UNAVAILABLE</text>
+<text class="a" x="716" y="1586">SOURCE_ERROR</text>
+<rect class="cls" x="875" y="1450" width="160" height="130"/>
+<line class="div" x1="875" y1="1496" x2="1035" y2="1496"/>
+<text class="st" x="955" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="955" y="1484" text-anchor="middle">ConnectorType</text>
+<text class="a" x="887" y="1514">fixtures</text>
+<text class="a" x="887" y="1532">github</text>
+<text class="a" x="887" y="1550">confluence</text>
+<text class="a" x="887" y="1568">jenkins</text>
+<rect class="cls" x="1046" y="1450" width="160" height="94"/>
+<line class="div" x1="1046" y1="1496" x2="1206" y2="1496"/>
+<text class="st" x="1126" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="1126" y="1484" text-anchor="middle">ConnectionStatus</text>
+<text class="a" x="1058" y="1514">active</text>
+<text class="a" x="1058" y="1532">disconnected</text>
+<rect class="cls" x="1217" y="1450" width="160" height="94"/>
+<line class="div" x1="1217" y1="1496" x2="1377" y2="1496"/>
+<text class="st" x="1297" y="1466" text-anchor="middle">«enumeration»</text>
+<text class="name" x="1297" y="1484" text-anchor="middle">Role</text>
+<text class="a" x="1229" y="1514">admin</text>
+<text class="a" x="1229" y="1532">member</text>
+</g>
+</svg>

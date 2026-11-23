@@ -1,9 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1290 1010" width="1290" height="1010" font-family="Helvetica, Arial, sans-serif">
-  <defs>
-    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#1d2530" stroke-width="1.4"/>
-    </marker>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1690 1200" width="1690" height="1200" font-family="Helvetica, Arial, sans-serif">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9" fill="none" stroke="#1d2530" stroke-width="1.4"/></marker></defs>
   <style>
     .box { fill: #ffffff; stroke: #1d2530; stroke-width: 1.4; }
     .comp { fill: none; stroke: #1d2530; stroke-width: 1.4; }
@@ -17,146 +13,221 @@
     .s { font-size: 12px; fill: #1d2530; }
     .l { font-size: 11.5px; fill: #1d2530; }
     .title { font-size: 15px; font-weight: bold; fill: #1d2530; }
-  </style>
-  <rect width="1290" height="1010" fill="#ffffff"/>
-  <text class="title" x="24" y="28">Team 22 system architecture · UML component diagram · as delivered (Phase 4)</text>
-  <text class="st" x="1266" y="22" text-anchor="end">solid arrow: request, call or file read · dashed arrow: response</text>
-  <text class="st" x="1266" y="36" text-anchor="end">numbers: order of one bundle request (1–6) and one test run (1, 2, 7)</text>
-  <g transform="translate(0,40)">
-<rect class="box" x="60" y="10" width="340" height="70" rx="4"/>
-<text class="st" x="230.0" y="27" text-anchor="middle">«actor»</text>
-<text class="s" x="230.0" y="44" text-anchor="middle">Compliance officers, QA leads, developers</text>
-<text class="st" x="230.0" y="62" text-anchor="middle">curl, Postman or scripts</text>
-<rect class="box" x="690" y="10" width="310" height="70" rx="4"/>
-<text class="st" x="845.0" y="27" text-anchor="middle">«actor»</text>
-<text class="s" x="845.0" y="44" text-anchor="middle">Course graders and other teams</text>
-<text class="st" x="845.0" y="62" text-anchor="middle">through a tester, or calling the system directly</text>
-<polyline class="e" points="240,80 240,161" marker-end="url(#arr)"/>
-<text class="l" x="248" y="104" text-anchor="start">1) POST /bundles {product_id, release_version} · GET /bundles/{id}</text>
-<polyline class="e" points="857,80 857,161" marker-end="url(#arr)"/>
-<text class="l" x="849" y="122" text-anchor="end">1) /tester/test/* · /system/*</text>
-<polyline class="ret" points="110,288 110,229" marker-end="url(#arr)"/>
-<polyline class="ret" points="110,163 110,82" marker-end="url(#arr)"/>
-<text class="l" x="118" y="100" text-anchor="start">6) JSON status,</text>
-<text class="l" x="118" y="114" text-anchor="start">manifest, zip</text>
-<rect class="node" x="20" y="130" width="990" height="720" rx="8"/>
-<text class="st" x="40" y="818" text-anchor="start">«execution environment» AWS EC2 · Ubuntu 24.04</text>
-<text class="st" x="40" y="834" text-anchor="start">live release: releases/&lt;version&gt;, current symlink</text>
-<rect class="box" x="40" y="163" width="950" height="64" rx="4"/>
-<text class="t" x="515.0" y="184" text-anchor="middle">«component» Pod common web-service interface</text>
-<text class="m" x="515.0" y="202" text-anchor="middle">Caddy (HTTPS :443) → gunicorn (1 worker, 8 threads) → wsgi.py routes by path prefix</text>
-<rect class="comp" x="40" y="250" width="670" height="420" rx="4"/>
-<text class="st" x="335" y="268" text-anchor="start">«component» System</text>
-<polyline class="e" points="190,227 190,288" marker-end="url(#arr)"/>
-<text class="l" x="198" y="243" text-anchor="start">2) /system/bundles…</text>
-<polyline class="e" points="545,227 545,288" marker-end="url(#arr)"/>
-<text class="l" x="553" y="243" text-anchor="start">2) /system/test/*</text>
-<rect class="box" x="60" y="290" width="260" height="55" rx="4"/>
-<text class="t" x="190.0" y="311" text-anchor="middle">Bundle API</text>
-<text class="m" x="190.0" y="329" text-anchor="middle">app.py · bundles in memory</text>
-<rect class="box" x="400" y="290" width="290" height="55" rx="4"/>
-<text class="t" x="545.0" y="311" text-anchor="middle">Test endpoints</text>
-<text class="m" x="545.0" y="329" text-anchor="middle">selftest.py · sessions · fixture list</text>
-<polyline class="e" points="190,345 190,373" marker-end="url(#arr)"/>
-<text class="l" x="198" y="364" text-anchor="start">3) background thread</text>
-<rect class="box" x="60" y="375" width="260" height="55" rx="4"/>
-<text class="t" x="190.0" y="396" text-anchor="middle">Bundle compiler</text>
-<text class="m" x="190.0" y="414" text-anchor="middle">bundle_service.py · status + zip</text>
-<rect class="box" x="400" y="375" width="290" height="57" rx="4"/>
-<text class="st" x="545.0" y="392" text-anchor="middle">«file»</text>
-<text class="t" x="545.0" y="409" text-anchor="middle">Source catalog</text>
-<text class="m" x="545.0" y="427" text-anchor="middle">source_catalog.json · pinned commits</text>
-<polyline class="e" points="190,430 190,458" marker-end="url(#arr)"/>
-<text class="l" x="198" y="449" text-anchor="start">4) retrieve and classify</text>
-<rect class="box" x="60" y="460" width="630" height="70" rx="4"/>
-<text class="t" x="375.0" y="481" text-anchor="middle">Artifact pipeline</text>
-<text class="m" x="375.0" y="499" text-anchor="middle">artifact_pipeline.py · list_fixture_files() → decide() · decide_github()</text>
-<text class="st" x="375.0" y="514" text-anchor="middle">rules decide by file name and first heading; Bedrock only proposes; code sets every status</text>
-<polyline class="e" points="545,460 545,434" marker-end="url(#arr)"/>
-<text class="l" x="553" y="452" text-anchor="start">reads</text>
-<polyline class="e" points="190,530 190,573" marker-end="url(#arr)"/>
-<text class="l" x="198" y="556" text-anchor="start">validates</text>
-<polyline class="e" points="385,530 385,573" marker-end="url(#arr)"/>
-<text class="l" x="393" y="556" text-anchor="start">asks for a category</text>
-<polyline class="e" points="595,530 595,573" marker-end="url(#arr)"/>
-<text class="l" x="603" y="556" text-anchor="start">fetches pinned file</text>
-<rect class="box" x="110" y="575" width="160" height="65" rx="4"/>
-<text class="t" x="190.0" y="596" text-anchor="middle">Format validation</text>
-<text class="m" x="190.0" y="614" text-anchor="middle">artifact_formats.py</text>
-<rect class="box" x="290" y="575" width="190" height="65" rx="4"/>
-<text class="t" x="385.0" y="596" text-anchor="middle">Classifier</text>
-<text class="m" x="385.0" y="614" text-anchor="middle">artifact_classifier.py</text>
-<text class="m" x="385.0" y="629" text-anchor="middle">bedrock_adapter.py</text>
-<rect class="box" x="500" y="575" width="190" height="65" rx="4"/>
-<text class="t" x="595.0" y="596" text-anchor="middle">GitHub connector</text>
-<text class="m" x="595.0" y="614" text-anchor="middle">github_artifact_retrieval.py</text>
-<text class="m" x="595.0" y="629" text-anchor="middle">github_client.py</text>
-<polyline class="e" points="80,530 80,718" marker-end="url(#arr)"/>
-<text class="l" x="86" y="700" text-anchor="start">5) list files</text>
-<rect class="box" x="60" y="720" width="300" height="80" rx="4"/>
-<text class="st" x="210.0" y="737" text-anchor="middle">«folder» controlled source</text>
-<text class="t" x="210.0" y="754" text-anchor="middle">fixtures/</text>
-<text class="m" x="210.0" y="772" text-anchor="middle">prd-88: v1.2 · v1.3 · v1.4 · v2.0 ·</text>
-<text class="m" x="210.0" y="787" text-anchor="middle">v1.2-github-inaccessible · bedrock-test/</text>
-<rect class="comp" x="720" y="250" width="270" height="310" rx="4"/>
-<text class="st" x="735" y="268" text-anchor="start">«component» Tester</text>
-<polyline class="e" points="857,227 857,288" marker-end="url(#arr)"/>
-<text class="l" x="865" y="243" text-anchor="start">2) /tester/test/*</text>
-<rect class="box" x="735" y="290" width="245" height="55" rx="4"/>
-<text class="t" x="857.5" y="311" text-anchor="middle">Tester API</text>
-<text class="m" x="857.5" y="329" text-anchor="middle">service.py · setup · run · report</text>
-<polyline class="e" points="792,345 792,383" marker-end="url(#arr)"/>
-<text class="l" x="800" y="368" text-anchor="start">setup</text>
-<polyline class="e" points="922,345 922,383" marker-end="url(#arr)"/>
-<text class="l" x="930" y="368" text-anchor="start">run</text>
-<rect class="box" x="735" y="385" width="117" height="55" rx="4"/>
-<text class="t2" x="793.5" y="406" text-anchor="middle">Setup handshake</text>
-<text class="m" x="793.5" y="424" text-anchor="middle">session.py</text>
-<rect class="box" x="863" y="385" width="117" height="62" rx="4"/>
-<text class="t2" x="921.5" y="406" text-anchor="middle">Acceptance suite</text>
-<text class="m" x="921.5" y="424" text-anchor="middle">suite.py</text>
-<text class="st" x="921.5" y="439" text-anchor="middle">15 tests</text>
-<polyline class="e" points="792,440 792,478" marker-end="url(#arr)"/>
-<text class="l" x="800" y="463" text-anchor="start">uses</text>
-<polyline class="e" points="880,447 854,478" marker-end="url(#arr)"/>
-<text class="l" x="884" y="474" text-anchor="start">uses</text>
-<polyline class="e" points="922,447 922,478" marker-end="url(#arr)"/>
-<text class="l" x="930" y="466" text-anchor="start">reads</text>
-<rect class="box" x="735" y="480" width="117" height="55" rx="4"/>
-<text class="t2" x="793.5" y="501" text-anchor="middle">HTTP client</text>
-<text class="m" x="793.5" y="519" text-anchor="middle">client.py</text>
-<rect class="box" x="863" y="480" width="117" height="62" rx="4"/>
-<text class="t2" x="921.5" y="501" text-anchor="middle">Expected results</text>
-<text class="m" x="921.5" y="519" text-anchor="middle">oracle.json</text>
-<text class="st" x="921.5" y="534" text-anchor="middle">+ fixture file bytes</text>
-<polyline class="e" points="385,640 385,878" marker-end="url(#arr)"/>
-<text class="l" x="393" y="700" text-anchor="start">HTTPS, signed with the</text>
-<text class="l" x="393" y="714" text-anchor="start">server's IAM role</text>
-<polyline class="e" points="595,640 595,878" marker-end="url(#arr)"/>
-<text class="l" x="603" y="730" text-anchor="start">HTTPS, read-only;</text>
-<text class="l" x="603" y="744" text-anchor="start">token optional</text>
-<polyline class="e" points="792,535 792,878" marker-end="url(#arr)"/>
-<text class="l" x="800" y="690" text-anchor="start">7) HTTPS: /test/setup,</text>
-<text class="l" x="800" y="704" text-anchor="start">/bundles…, /test/report</text>
-<rect class="box" x="260" y="880" width="250" height="72" rx="4"/>
-<text class="st" x="385.0" y="897" text-anchor="middle">«external»</text>
-<text class="t" x="385.0" y="914" text-anchor="middle">Amazon Bedrock</text>
-<text class="m" x="385.0" y="932" text-anchor="middle">bedrock-mantle · gpt-oss-20b</text>
-<rect class="box" x="520" y="880" width="230" height="72" rx="4"/>
-<text class="st" x="635.0" y="897" text-anchor="middle">«external»</text>
-<text class="t" x="635.0" y="914" text-anchor="middle">GitHub REST API</text>
-<text class="st" x="635.0" y="932" text-anchor="middle">prithika-sundar/cra-artifact-test</text>
-<rect class="box" x="770" y="880" width="230" height="72" rx="4"/>
-<text class="st" x="885.0" y="897" text-anchor="middle">«external»</text>
-<text class="t" x="885.0" y="914" text-anchor="middle">Target system</text>
-<text class="st" x="885.0" y="932" text-anchor="middle">any pod team's /system base URL</text>
-<rect class="box" x="1060" y="163" width="200" height="120" rx="4"/>
-<text class="st" x="1160.0" y="180" text-anchor="middle">«external»</text>
-<text class="t" x="1160.0" y="197" text-anchor="middle">GitHub Actions</text>
-<text class="st" x="1160.0" y="215" text-anchor="middle">deploy job on main, after the</text>
-<text class="st" x="1160.0" y="230" text-anchor="middle">static and test jobs pass;</text>
-<text class="st" x="1160.0" y="245" text-anchor="middle">release via S3 + SSM, smoke</text>
-<text class="st" x="1160.0" y="260" text-anchor="middle">test, rollback on failure</text>
-<polyline class="e" points="1060,223 1012,223" marker-end="url(#arr)"/>
-<text class="l" x="1036" y="214" text-anchor="middle">deploys</text>
-</g></svg>
+</style>
+  <rect width="1690" height="1200" fill="#ffffff"/>
+<text class="title" x="24" y="28">Team 22 system architecture · UML component diagram · as delivered (Phase 5)</text>
+<text class="st" x="1666" y="22" text-anchor="end">solid arrow: request, call or file read · dashed arrow: response</text>
+<text class="st" x="1666" y="36" text-anchor="end">numbers: order of one bundle request (1–6) and one test run (1, 2, 7)</text>
+<g transform="translate(0,40)">
+<rect class="box" x="250" y="10" width="400" height="70" rx="4"/>
+<text class="st" x="450" y="34.2" text-anchor="middle">«actor»</text>
+<text class="s" x="450" y="49.2" text-anchor="middle">Compliance officers, QA leads, developers</text>
+<text class="st" x="450" y="64.2" text-anchor="middle">company pages in a browser, or API scripts</text>
+<rect class="box" x="820" y="10" width="310" height="70" rx="4"/>
+<text class="st" x="975" y="34.2" text-anchor="middle">«actor»</text>
+<text class="s" x="975" y="49.2" text-anchor="middle">Course graders and other teams</text>
+<text class="st" x="975" y="64.2" text-anchor="middle">through a tester, or calling /system directly</text>
+<polyline class="e" points="450,80 450,158" marker-end="url(#arr)"/>
+<text class="l" x="442" y="104" text-anchor="end">1) POST /bundles · POST /orgs/{org_id}/bundles · GET /bundles/{id}</text>
+<text class="l" x="442" y="118" text-anchor="end">sign-in and company pages: /auth/*, /app/*</text>
+<polyline class="ret" points="600,158 600,82" marker-end="url(#arr)"/>
+<text class="l" x="608" y="104">6) JSON status, manifest,</text>
+<text class="l" x="608" y="118">zip; HTML pages</text>
+<polyline class="e" points="975,80 975,158" marker-end="url(#arr)"/>
+<text class="l" x="983" y="110">1) /tester/test/* · /system/*</text>
+<rect class="node" x="190" y="128" width="1200" height="882" rx="8"/>
+<text class="st" x="206" y="978">«execution environment» AWS EC2 · Ubuntu 24.04</text>
+<text class="st" x="206" y="994">live release: releases/&lt;version&gt;, current symlink</text>
+<rect class="box" x="210" y="160" width="1160" height="64" rx="4"/>
+<text class="t" x="790" y="189.26" text-anchor="middle">«component» Pod common web-service interface</text>
+<text class="m" x="790" y="204.7" text-anchor="middle">Caddy (HTTPS :443) → gunicorn (1 worker, 8 threads) → wsgi.py routes /system and /tester</text>
+<rect class="comp" x="210" y="248" width="820" height="682" rx="4"/>
+<text class="st" x="222" y="266">«component» System</text>
+<polyline class="e" points="345,224 345,288" marker-end="url(#arr)"/>
+<text class="l" x="353" y="244">/system/auth/*</text>
+<text class="l" x="353" y="258">/system/app/*</text>
+<polyline class="e" points="690,224 690,288" marker-end="url(#arr)"/>
+<text class="l" x="698" y="244">2) /system/bundles</text>
+<text class="l" x="698" y="258">/system/orgs/{id}/bundles</text>
+<polyline class="e" points="900,224 900,288" marker-end="url(#arr)"/>
+<text class="l" x="908" y="250">2) /system/test/*</text>
+<polyline class="ret" points="600,290 600,226" marker-end="url(#arr)"/>
+<rect class="box" x="230" y="290" width="245" height="80" rx="4"/>
+<text class="t" x="352.5" y="312.26" text-anchor="middle">Accounts and sign-in</text>
+<text class="m" x="352.5" y="327.7" text-anchor="middle">auth.py · accounts.py</text>
+<text class="m" x="352.5" y="342.7" text-anchor="middle">account_pages.py · source_pages.py</text>
+<text class="m" x="352.5" y="357.7" text-anchor="middle">org_sources.py</text>
+<rect class="box" x="580" y="290" width="220" height="80" rx="4"/>
+<text class="t" x="690" y="319.76" text-anchor="middle">Bundle API</text>
+<text class="m" x="690" y="335.2" text-anchor="middle">app.py · bundles in memory</text>
+<text class="m" x="690" y="350.2" text-anchor="middle">rate_limits.py · 429</text>
+<rect class="box" x="830" y="290" width="180" height="80" rx="4"/>
+<text class="t" x="920" y="319.76" text-anchor="middle">Test endpoints</text>
+<text class="m" x="920" y="335.2" text-anchor="middle">selftest.py</text>
+<text class="st" x="920" y="350.2" text-anchor="middle">sessions · shared release list</text>
+<polyline class="e" points="580,312 477,312" marker-end="url(#arr)"/>
+<text class="l" x="527" y="305" text-anchor="middle">who is calling?</text>
+<polyline class="e" points="475,350 578,350" marker-end="url(#arr)"/>
+<text class="l" x="527" y="343" text-anchor="middle">starts bundles</text>
+<rect class="box" x="230" y="405" width="230" height="120" rx="4"/>
+<text class="t" x="345" y="439.76" text-anchor="middle">Account data access</text>
+<text class="m" x="345" y="455.2" text-anchor="middle">tenant_store.py</text>
+<text class="m" x="345" y="470.2" text-anchor="middle">secret_store.py</text>
+<text class="st" x="345" y="485.2" text-anchor="middle">records in DynamoDB,</text>
+<text class="st" x="345" y="500.2" text-anchor="middle">tokens and app secrets in SSM</text>
+<polyline class="e" points="345,370 345,403" marker-end="url(#arr)"/>
+<text class="l" x="353" y="391">reads, writes</text>
+<rect class="box" x="580" y="405" width="220" height="60" rx="4"/>
+<text class="t" x="690" y="432.26" text-anchor="middle">Bundle compiler</text>
+<text class="m" x="690" y="447.7" text-anchor="middle">bundle_service.py · status + zip</text>
+<polyline class="e" points="690,370 690,403" marker-end="url(#arr)"/>
+<text class="l" x="698" y="391">3) background thread</text>
+<rect class="box" x="830" y="405" width="180" height="80" rx="4"/>
+<text class="st" x="920" y="425.7" text-anchor="middle">«file»</text>
+<text class="t" x="920" y="442.26" text-anchor="middle">Pod-test account</text>
+<text class="m" x="920" y="457.7" text-anchor="middle">test_account.json</text>
+<text class="m" x="920" y="472.7" text-anchor="middle">account_config.py</text>
+<rect class="box" x="230" y="575" width="780" height="70" rx="4"/>
+<text class="t" x="620" y="599.76" text-anchor="middle">Artifact pipeline</text>
+<text class="m" x="620" y="615.2" text-anchor="middle">artifact_pipeline.py · retrieve_and_classify(): company account → pod-test account → fixtures/ + catalog</text>
+<text class="st" x="620" y="630.2" text-anchor="middle">rules decide by file name and first heading; Bedrock only proposes; code sets every status</text>
+<polyline class="e" points="420,575 420,527" marker-end="url(#arr)"/>
+<text class="l" x="428" y="556">company sources, tokens</text>
+<polyline class="e" points="690,465 690,573" marker-end="url(#arr)"/>
+<text class="l" x="698" y="525">4) retrieve and classify</text>
+<polyline class="e" points="920,575 920,487" marker-end="url(#arr)"/>
+<text class="l" x="928" y="535">reads</text>
+<rect class="box" x="230" y="700" width="155" height="65" rx="4"/>
+<text class="t" x="307.5" y="729.76" text-anchor="middle">Format validation</text>
+<text class="m" x="307.5" y="745.2" text-anchor="middle">artifact_formats.py</text>
+<polyline class="e" points="308,645 308,698" marker-end="url(#arr)"/>
+<text class="l" x="316" y="676">validates</text>
+<rect class="box" x="425" y="700" width="175" height="65" rx="4"/>
+<text class="st" x="512.5" y="720.7" text-anchor="middle">«file»</text>
+<text class="t" x="512.5" y="737.26" text-anchor="middle">Source catalog</text>
+<text class="m" x="512.5" y="752.7" text-anchor="middle">source_catalog.json</text>
+<polyline class="e" points="512,645 512,698" marker-end="url(#arr)"/>
+<text class="l" x="520" y="676">reads</text>
+<rect class="box" x="850" y="700" width="160" height="75" rx="4"/>
+<text class="st" x="930" y="725.7" text-anchor="middle">«folder» controlled source</text>
+<text class="t" x="930" y="742.26" text-anchor="middle">fixtures/</text>
+<text class="st" x="930" y="757.7" text-anchor="middle">prd-88 releases · bedrock-test/</text>
+<polyline class="e" points="930,645 930,698" marker-end="url(#arr)"/>
+<text class="l" x="938" y="676">5) list files</text>
+<polyline class="e" points="405,645 405,828" marker-end="url(#arr)"/>
+<text class="l" x="413" y="800">asks for a category</text>
+<polyline class="e" points="625,645 625,828" marker-end="url(#arr)"/>
+<text class="l" x="633" y="676">fetches pinned file</text>
+<polyline class="e" points="790,645 790,828" marker-end="url(#arr)"/>
+<text class="l" x="798" y="676">fetches each source</text>
+<rect class="box" x="230" y="830" width="190" height="70" rx="4"/>
+<text class="t" x="325" y="854.76" text-anchor="middle">Classifier</text>
+<text class="m" x="325" y="870.2" text-anchor="middle">artifact_classifier.py</text>
+<text class="m" x="325" y="885.2" text-anchor="middle">bedrock_adapter.py</text>
+<rect class="box" x="440" y="830" width="240" height="70" rx="4"/>
+<text class="t" x="560" y="854.76" text-anchor="middle">GitHub retrieval (catalog)</text>
+<text class="m" x="560" y="870.2" text-anchor="middle">github_artifact_retrieval.py</text>
+<text class="m" x="560" y="885.2" text-anchor="middle">github_client.py</text>
+<rect class="box" x="700" y="830" width="310" height="70" rx="4"/>
+<text class="t" x="855" y="854.76" text-anchor="middle">Connector kit</text>
+<text class="m" x="855" y="870.2" text-anchor="middle">connectors/ · base.py · safe_http.py</text>
+<text class="m" x="855" y="885.2" text-anchor="middle">fixtures · github · confluence · jenkins</text>
+<polyline class="e" points="980,830 980,777" marker-end="url(#arr)"/>
+<text class="l" x="972" y="805" text-anchor="end">fixtures connector reads</text>
+<rect class="box" x="6" y="285" width="140" height="60" rx="4"/>
+<text class="st" x="76" y="303.2" text-anchor="middle">«external»</text>
+<text class="t" x="76" y="319.76" text-anchor="middle">Amazon Cognito</text>
+<text class="st" x="76" y="335.2" text-anchor="middle">user pool + hosted login</text>
+<polyline class="e" points="230,315 148,315" marker-end="url(#arr)"/>
+<text class="l" x="168" y="309" text-anchor="middle">sign-in</text>
+<rect class="box" x="6" y="395" width="140" height="60" rx="4"/>
+<text class="st" x="76" y="413.2" text-anchor="middle">«external»</text>
+<text class="t" x="76" y="429.76" text-anchor="middle">Amazon DynamoDB</text>
+<text class="st" x="76" y="445.2" text-anchor="middle">team22-cra-tenants</text>
+<polyline class="e" points="230,425 148,425" marker-end="url(#arr)"/>
+<text class="l" x="168" y="419" text-anchor="middle">records</text>
+<rect class="box" x="6" y="475" width="140" height="60" rx="4"/>
+<text class="st" x="76" y="493.7" text-anchor="middle">«external»</text>
+<text class="t2" x="76" y="509.48" text-anchor="middle">SSM Parameter Store</text>
+<text class="st" x="76" y="524.7" text-anchor="middle">SecureString tokens</text>
+<polyline class="e" points="230,505 148,505" marker-end="url(#arr)"/>
+<text class="l" x="168" y="499" text-anchor="middle">tokens</text>
+<rect class="box" x="6" y="835" width="140" height="60" rx="4"/>
+<text class="st" x="76" y="853.2" text-anchor="middle">«external»</text>
+<text class="t" x="76" y="869.76" text-anchor="middle">Amazon Bedrock</text>
+<text class="st" x="76" y="885.2" text-anchor="middle">gpt-oss-20b</text>
+<polyline class="e" points="230,865 148,865" marker-end="url(#arr)"/>
+<text class="l" x="168" y="859" text-anchor="middle">HTTPS</text>
+<rect class="box" x="440" y="1050" width="320" height="72" rx="4"/>
+<text class="st" x="600" y="1066.7" text-anchor="middle">«external»</text>
+<text class="t" x="600" y="1083.26" text-anchor="middle">GitHub REST API</text>
+<text class="st" x="600" y="1098.7" text-anchor="middle">prithika-sundar/cra-artifact-test</text>
+<text class="st" x="600" y="1113.7" text-anchor="middle">and company repositories</text>
+<polyline class="e" points="560,900 560,1048" marker-end="url(#arr)"/>
+<text class="l" x="568" y="960">HTTPS, read-only</text>
+<polyline class="e" points="730,900 730,1048" marker-end="url(#arr)"/>
+<text class="l" x="738" y="960">HTTPS, token</text>
+<rect class="box" x="775" y="1050" width="170" height="72" rx="4"/>
+<text class="st" x="860" y="1066.7" text-anchor="middle">«external»</text>
+<text class="t" x="860" y="1083.26" text-anchor="middle">Confluence Cloud</text>
+<text class="st" x="860" y="1098.7" text-anchor="middle">Atlassian REST API v2</text>
+<text class="st" x="860" y="1113.7" text-anchor="middle">page attachments</text>
+<polyline class="e" points="860,900 860,1048" marker-end="url(#arr)"/>
+<text class="l" x="868" y="960">HTTPS, token</text>
+<rect class="box" x="960" y="1050" width="190" height="72" rx="4"/>
+<text class="st" x="1055" y="1066.7" text-anchor="middle">«external»</text>
+<text class="t" x="1055" y="1083.26" text-anchor="middle">Jenkins (pod)</text>
+<text class="st" x="1055" y="1098.7" text-anchor="middle">jenk-30861.jscarfo.com</text>
+<text class="st" x="1055" y="1113.7" text-anchor="middle">behind Cloudflare</text>
+<polyline class="e" points="990,900 990,1048" marker-end="url(#arr)"/>
+<text class="l" x="998" y="960">HTTPS, token</text>
+<rect class="box" x="1165" y="1050" width="210" height="72" rx="4"/>
+<text class="st" x="1270" y="1074.2" text-anchor="middle">«external»</text>
+<text class="t" x="1270" y="1090.76" text-anchor="middle">Target system</text>
+<text class="st" x="1270" y="1106.2" text-anchor="middle">any pod team's /system base URL</text>
+<rect class="comp" x="1050" y="248" width="320" height="340" rx="4"/>
+<text class="st" x="1062" y="266">«component» Tester</text>
+<polyline class="e" points="1210,224 1210,288" marker-end="url(#arr)"/>
+<text class="l" x="1218" y="258">2) /tester/test/*</text>
+<rect class="box" x="1065" y="290" width="290" height="55" rx="4"/>
+<text class="t" x="1210" y="314.76" text-anchor="middle">Tester API</text>
+<text class="m" x="1210" y="330.2" text-anchor="middle">service.py · setup · run · report</text>
+<polyline class="e" points="1135,345 1135,383" marker-end="url(#arr)"/>
+<text class="l" x="1143" y="368">setup</text>
+<polyline class="e" points="1285,345 1285,383" marker-end="url(#arr)"/>
+<text class="l" x="1293" y="368">run</text>
+<rect class="box" x="1065" y="385" width="140" height="55" rx="4"/>
+<text class="t2" x="1135" y="409.48" text-anchor="middle">Setup handshake</text>
+<text class="m" x="1135" y="424.7" text-anchor="middle">session.py</text>
+<rect class="box" x="1215" y="385" width="140" height="62" rx="4"/>
+<text class="t2" x="1285" y="405.48" text-anchor="middle">Acceptance suite</text>
+<text class="m" x="1285" y="420.7" text-anchor="middle">suite.py</text>
+<text class="st" x="1285" y="435.7" text-anchor="middle">15 tests · coverage</text>
+<polyline class="e" points="1135,440 1135,478" marker-end="url(#arr)"/>
+<text class="l" x="1143" y="463">uses</text>
+<polyline class="e" points="1232,447 1207,478" marker-end="url(#arr)"/>
+<text class="l" x="1238" y="472">uses</text>
+<polyline class="e" points="1285,447 1285,478" marker-end="url(#arr)"/>
+<text class="l" x="1293" y="466">reads</text>
+<rect class="box" x="1065" y="480" width="140" height="55" rx="4"/>
+<text class="t2" x="1135" y="504.48" text-anchor="middle">HTTP client</text>
+<text class="m" x="1135" y="519.7" text-anchor="middle">client.py</text>
+<rect class="box" x="1215" y="480" width="140" height="92" rx="4"/>
+<text class="t2" x="1285" y="507.98" text-anchor="middle">Expected results</text>
+<text class="m" x="1285" y="523.2" text-anchor="middle">oracle.json</text>
+<text class="st" x="1285" y="538.2" text-anchor="middle">+ fixture file bytes</text>
+<text class="st" x="1285" y="553.2" text-anchor="middle">+ design requirements</text>
+<polyline class="e" points="1180,535 1180,1048" marker-end="url(#arr)"/>
+<text class="l" x="1188" y="700">7) HTTPS: /test/setup,</text>
+<text class="l" x="1188" y="714">/bundles…, /test/report</text>
+<rect class="box" x="1440" y="160" width="230" height="130" rx="4"/>
+<text class="st" x="1555" y="190.7" text-anchor="middle">«external»</text>
+<text class="t" x="1555" y="207.26" text-anchor="middle">GitHub Actions</text>
+<text class="st" x="1555" y="222.7" text-anchor="middle">deploy job on main, after the</text>
+<text class="st" x="1555" y="237.7" text-anchor="middle">static and test jobs pass;</text>
+<text class="st" x="1555" y="252.7" text-anchor="middle">release via S3 + SSM, smoke</text>
+<text class="st" x="1555" y="267.7" text-anchor="middle">test, rollback on failure</text>
+<polyline class="e" points="1440,200 1392,200" marker-end="url(#arr)"/>
+<text class="l" x="1416" y="192" text-anchor="middle">deploys</text>
+</g>
+</svg>
